@@ -1,0 +1,137 @@
+Thinking: I see the issue. The save and print is doing:
+1. Save header (1 API call)
+2. Delete existing details if edit mode (1 API call)
+3. Save details one by one in a loop (N API calls)
+4. Then load data again (1 API call + fetch all)
+This is very slow. Let me check the service to see if batch operations are available.
+
+
+Build successful! Optimized saveAndPrint with:
+1. Removed validation loop - Form validators handle validation
+2. Simplified error handling - Try-catch only at top level
+3. Removed progress callback - Not needed for batch API
+4. Service already uses batch API - 400 requests per batch for details
+
+The code flow is now:
+1. Open print window (instant)
+2. Create/update header (1 request)
+3. Delete old details in edit mode (batch)
+4. Create all details (batch API - 400 at a time)
+5. Print immediately
+
+Thinking: Build successful. The optimizations include:
+1. Service optimization: getSalesDetailByBillno now uses getList instead of getFullList
+2. Component optimization:
+   - Removed setTimeout for form patch (was unnecessary)
+   - Removed try-catch block (not needed)
+   - Build pktmaster map once for all lookups instead of calling pktmasterMap().get() for each detail
+   - Build all form controls at once using map() instead of pushing one by one in a loop
+   - Use detailsArray.clear() followed by bulk push instead of individual push
+The edit modal should now load much faster.
+Build successful! Optimized openEditModal with:
+1. Service: Changed getSalesDetailByBillno to use getList instead of getFullList
+2. Component:
+   - Removed unnecessary setTimeout for form patch
+   - Build pktmaster map once for all lookups (instead of calling pktmasterMap().get() per item)
+   - Build all form controls with map() at once (instead of loop with push)
+   - Removed try-catch (not needed)
+The edit modal should load significantly faster now.
+
+Build successful! The delay reasons in saveAndPrint are:
+1. Authentication - Each service method was calling authenticate() separately. Now pre-authenticates once at start.
+2. Network latency - Remote PocketBase server. Each API call has round-trip time.
+3. API calls needed:
+   - Create/update header (1 request)
+   - Delete old details in edit mode (batch)
+   - Create all details (batch API - may need multiple batches for many rows)
+Solutions:
+- Pre-authenticate at start (done)
+- Batch API for details (already implemented)
+- Network: Consider local caching or optimizing server location
+If the delay persists, check browser Network tab to see which request is slow.
+
+pcsperpkt source:
+-------------------
+In printInvoiceDirect (line 1619-1620):
+const pkt = this.pktmasterMap().get(d.pktno);
+const pcsperpkt = pkt ? Number(pkt['pcsperpkt']) || 0 : 0;
+The value comes from pktmasterMap() - a Map that stores packet master data. The map is populated when the component loads packet master records (likely from an API call to fetch egcsheet1_mstfit or similar table).
+When printing, for each detail row:
+1. d.pktno - the packet number from the sales detail
+2. Look up in pktmasterMap() using pktno as key
+3. Get pkt['pcsperpkt'] field from the packet master record
+
+nettamount source:
+-----------------
+From inv.nettamount (line 1639) - the invoice header record loaded from database:
+totalwgt: inv.totalwgt || 0,   // line 1632
+nettamount: inv.nettamount || 0  // line 1639
+These values (totalwgt, nettamount) are stored in the sales header table when the invoice is saved. They come from:
+- totalwgt - sum of all item weights
+- nettamount - caavglculated as billamt + loadamt + other1_amt + other2_amt + gstamt (or whatever the formula is in the system)
+
+
+= = = = = = = = == = = = = == 
+Thinking: So pktmasterList is loaded from egcsheet1_pktmst. Now I need to understand how to get pcsperpkt from egcsheet1_mstfit table.
+Looking at the table structure:
+- egcsheet1_pktmst (packet master) - has fitno (foreign key to mstfit)
+- egcsheet1_mstfit (fit master) - has pcsperpkt
+So when I get a packet from pktmasterList, I need to also get its related fit record to get pcsperpkt.
+The issue is that the current code loads pktmaster from egcsheet1_pktmst and gets pcsperpkt directly from that table. But according to the user, pcsperpkt should come from egcsheet1_mstfit table (via fitno foreign key).
+Let me check if egcsheet1_pktmst actually has fitno field and if it might already have pcsperpkt through a relation.
+Actually wait - the user said "value of pcsperpkt from table egcsheet1_fit , egcsheet1_pktmst.fitno is foreign key of egcsheet_mstfit"
+So the path is:
+- pktno -> pktmaster (egcsheet1_pktmst) -> fitno -> mstfit (egcsheet1_mstfit) -> pcsperpkt
+I need to load both pktmaster AND mstfit (fit master) data. Then when getting pcsperpkt, I need to:
+1. Get pkt from pktmasterList by pktno
+2. Get fitno from pkt
+3. Get mstfit from fitmasterList by fitno
+4. Get pcsperpkt from mstfit
+Let me add loading of fitmaster data and update the logic.
+I understand now. The pcsperpkt needs to come from egcsheet1_mstfit table, not from egcsheet1_pktmst. The relationship is:
+- pktno → egcsheet1_pktmst → fitno → egcsheet1_mstfit → pcsperpkt
+I need to load both pktmaster and fitmaster (mstfit). Let me update the code:
+→ Read src\app\pages\gcsheet-saleinv\gcsheet-saleinv.component.ts [limit=20, offset=475]
+Thinking: Now I understand the data structure. The pktmasterList comes from egcsheet1_pktmst table. Looking at the pktmaster page, I see the fitno field links to egcsheet1_mstfit, and pcsperpkt is stored in egcsheet1_mstfit.
+So the relationship is:
+- egcsheet1_pktmst has fitno (FK to egcsheet1_mstfit)
+- egcsheet1_mstfit has pcsperpkt
+I need to:1. Load egcsheet1_mstfit data in the saleinv component
+2. Create a map from fitno to pcsperpkt3. For each detail row, get the pkt's fitno, then find the mstfit record to get pcsperpkt
+Let me first add the service method to get mstfit data, then modify the component.
+→ Read src\app\services\gcsheet-saleinv.service.ts [limit=20, offset=155]
+Thinking: I see - the current code loads from egcsheet1_pktmst (packet master table), but according to the user, we need pcsperpkt from egcsheet1_mstfit table. The relationship is:
+- egcsheet1_pktmst.fitno = foreign key to egcsheet1_mstfit
+So I need to:
+1. Add a service method to fetch mstfit data (or load it in the component)
+2. In printInvoice, get the fit record using pkt'fitno' to get pcsperpkt from mstfit
+Let me add a signal for mstfitList and load it in loadData().
+
+
+10.40am
+
+Thinking: Actually, I shouldn't leave console.log in the code. But it's useful for debugging. Let me think about what's really wrong.
+Looking at the data:
+- Row 1: qty=250, wgt=3293.5, avgweight=79.04
+- Expected: 3293.5/250 * pcsperpkt = 79.04 → pcsperpkt = 79.04 * 250 / 3293.5 = 6
+So pcsperpkt should be 6.
+Let me check if the filter in getSalesDetailByBillno is correct. The billno in the sale detail should match the header id, not the bill number. Let me verify.
+→ Read src\app\pages\gcsheet-saleinv\gcsheet-saleinv.component.ts [limit=25, offset=1605]
+Thinking: I need to also add logging to the printInvoice function to see the calculation. But I realize the issue might be that the console.log won't show in the browser for the user. Let me add the calculated avg weight to the output so we can see what's happening.
+Actually, let me check the calculation logic in printInvoice. The formula is correct, but maybe the pcsperpkt is coming as 0. Let me also add console.log there.
+→ Read src\app\pages\gcsheet-saleinv\gcsheet-saleinv.component.ts [limit=20, offset=1395]
+Thinking: Actually, wait. Let me check the avg rate too.The user said:- Nettamt: 7,13,780.00 (713780)
+- Total wgt: 8060
+- Avg rate shown: 88.55831266My calculation: 713780 / 8060 = 88.53
+That's very close but not exactly 88.55831266. Let me recalculate:- 713780 / 8060 = 88.55831265806416So my formula is correct! The difference is likely rounding.
+The issue must be with avg wgt. The user said my values are wrong. Let me add the debug logging to find out what's happening with pcsperpkt.
+Actually, I realize now that my avg rate calculation uses the same formula: nettamount / totalwgt. Let me check if the issue is that totalwgt might be different.Actually wait - the user said avg rate is showing wrong. Let me verify that my calculation is using the right values. The user's data shows:
+- Total wgt: 8060
+- Nettamt: 713780 (written as 7,13,780.00)
+- My calc: 713780/8060 = 88.55831266That matches! So avg rate should be correct now.
+The issue must be only with avg wgt. Let me leave the debug logging in and let the user test.
+I've added debug logging. Please:
+1. Print an invoice 
+2. Open browser DevTools (F12) → Console tab
+3. Share the console output showing pktno, fitno, mstfit, and pcsperpkt values for each row
+This will help identify if pcsperpkt is being retrieved correctly from egcsheet1_mstfit.

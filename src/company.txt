@@ -1,0 +1,153 @@
+
+Found the issues. The main problems are:
+1. Fetching ALL records at once - getFullList() loads everything to client
+2. Client-side filtering/sorting/pagination - Computed on every change
+3. Sequential import - One API call per row
+Let me optimize the service first:
+
+Actually, looking at the code more closely, I realize there's one issue - 
+the batch API needs to be explicitly enabled in the PocketBase dashboard. 
+Let me also add error handling for when batch API is not enabled. Also, 
+I should handle potential failures in the batch create - if the batch fails, 
+I should fall back to individual creates.
+Let me also add try-catch around the batch create to handle potential errors
+
+
+I see there are duplicate declarations and the old computed properties are still there. I need to remove the duplicate declarations 
+and remove the old computed properties (filteredData, totalFilteredItems, paginatedData). Let me do that.
+
+Thinking: There are errors to fix:
+1. Duplicate data signal - need to remove one
+2. subscribe doesn't exist on WritableSignal - need to use rxjs or another approach
+Let me read the component again to find and fix the duplicates.
+
+
+1. No pagination on initial data load - getFullList() loads all records at once. With PocketBase, if there are many records, this will be slow.
+2. Client-side filtering and sorting - All data is loaded, then filtered/sorted on the client. This is fine for small datasets but slow for large ones.
+3. Import is doing individual creates - Each record is created one by one in a loop. This is very slow - should use batch API.
+4. Loading all data again after save/delete - loadData() is called after every save/delete, which fetches all records again.
+Let me check the PocketbaseService to understand the caching mechanism better, and then provide optimizations.
+Key optimizations:
+1. Use paginated API (getList) instead of getFullList for initial load
+2. Use PocketBase batch API for imports
+3. For small datasets (which seems to be the case - only name field), client-side filtering is actually fine
+4. Cache more aggressively
+Let me check the PocketbaseService.
+→ Read src\app\services\pocketbase.service.ts 
+Thinking: Now I understand the full picture. The performance issues are:
+1. Fetching all records at once - getFullList() fetches everything without pagination
+2. Client-side filtering/sorting/pagination - All done in memory with computed signals
+3. Sequential import - Importing records one by one in a loop
+4. No server-side filtering - Can't leverage PocketBase API filtering
+Let me optimize this:
+1. Add pagination to the service - Use PocketBase's built-in pagination with getList() instead of getFullList()
+2. Add server-side search - Use PocketBase filter syntax
+3. Add server-side sorting - Use PocketBase sort parameter
+4. Use batch API for imports - Use PocketBase batch endpoint
+5. Optimize the computed signals - Cache filtered results with debouncing for search
+Let me update both the service and component.
+Found the issues. The main problems are:
+1. Fetching ALL records at once - getFullList() loads everything to client
+2. Client-side filtering/sorting/pagination - Computed on every change
+3. Sequential import - One API call per row
+Let me optimize the service first:
+← Edit src\app\services\gcsheet-company.service.ts
+import { Injectable } from '@angular/core';
+import { PocketbaseService } from './pocketbase.service';
+export interface CompanyRecord {
+  id: string;
+  name: string;
+}
+export interface PaginatedResult<T> {
+  items: T[];
+  totalItems: number;
+  totalPages: number;
+  page: number;
+  perPage: number;
+}
+@Injectable({
+  providedIn: 'root'
+})
+export class GcsheetCompanyService {
+  private pb = PocketbaseService.getInstance().getClient();
+  private cacheKey = 'gcsheet_company_page_';
+  async getAll(): Promise<any[]> {
+    const cacheKey = 'gcsheet_company_all';
+    const cached = PocketbaseService.getInstance().getCached<any[]>(cacheKey);
+  async getPaginated(
+    page = 1,
+    perPage = 50,
+    search?: string,
+    sortBy = 'name',
+    sortOrder: 'asc' | 'desc' = 'asc'
+  ): Promise<PaginatedResult<CompanyRecord>> {
+    const cacheKey = `${this.cacheKey}${page}_${perPage}_${search || ''}_${sortBy}_${sortOrder}`;
+    const cached = PocketbaseService.getInstance().getCached<PaginatedResult<CompanyRecord>>(cacheKey);
+    if (cached) return cached;
+    const filterParts: string[] = [];
+    if (search) {
+      filterParts.push(`name ~ "${search}"`);
+    }
+    const filter = filterParts.length > 0 ? filterParts.join(' && ') : '';
+    const result = await PocketbaseService.getInstance().withRetry(async () => {
+      return await this.pb.collection('egcsheet1_mstcmp').getList(page, perPage, {
+        filter,
+        sort: `${sortOrder === 'desc' ? '-' : ''}${sortBy}`,
+        requestKey: null
+      });
+    });
+    const paginatedResult: PaginatedResult<CompanyRecord> = {
+      items: result.items.map((r: any) => ({ id: r.id, name: r.name })),
+      totalItems: result.totalItems,
+      totalPages: result.totalPages,
+      page: result.page,
+      perPage: result.perPage
+    };
+    PocketbaseService.getInstance().setCache(cacheKey, paginatedResult);
+    return paginatedResult;
+  }
+  async getAll(): Promise<CompanyRecord[]> {
+    const records = await PocketbaseService.getInstance().withRetry(async () => {
+      return await this.pb.collection('egcsheet1_mstcmp').getFullList({
+        requestKey: null
+      });
+    });
+    return records.map((r: any) => ({ id: r.id, name: r.name }));
+  }
+    PocketbaseService.getInstance().setCache(cacheKey, records);
+    return records;
+  async checkDuplicateName(name: string, excludeId?: string): Promise<boolean> {
+    const filter = excludeId 
+      ? `name = "${name.toLowerCase()}" && id != "${excludeId}"`
+      : `name = "${name.toLowerCase()}"`;
+    const result = await this.pb.collection('egcsheet1_mstcmp').getList(1, 1, {
+      filter,
+      requestKey: null
+    });
+    return result.totalItems > 0;
+  }
+  async batchCreate(records: { name: string }[]): Promise<{ imported: number; failed: number }> {
+    const batch = this.pb.createBatch();
+    records.forEach(data => {
+      batch.collection('egcsheet1_mstcmp').create(data);
+    });
+    
+    const results = await batch.send();
+    let imported = 0;
+    let failed = 0;
+    
+    results.forEach((r: any) => {
+      if (r.status >= 200 && r.status < 300) {
+        imported++;
+      } else {
+        failed++;
+      }
+    });
+    
+    PocketbaseService.getInstance().invalidateCache(this.cacheKey);
+    return { imported, failed };
+  }
+  async create(data: { name: string }): Promise<{ success: boolean; record?: any; error?: string }> {
+    try {
+      const record = await this.pb.collection('egcsheet1_mstcmp').create(data);
+      PocketbaseService.getInstance().invalidateCache('gcsheet_company_all');

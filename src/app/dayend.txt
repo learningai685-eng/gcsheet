@@ -1,0 +1,23 @@
+1. Day End button now:
+   - Deletes data from egcsheet1_salesmy, egcsheet1_saledet where billdate = selected date
+   - Updates egcsheet1_logfile set status=true where todaydate = selected date
+   - Inserts new record in egcsheet1_logfile with next day's date and status=false
+   - Sets mtodaydate global to next day's date
+   - Logs out (clears auth) and navigates to login
+2. Login now:
+   - After successful login, loads mtodaydate from gcsheet1_logfile where status=false
+   - Sets it in the global service
+3. Sale Invoice now:
+   - Uses mtodaydate (from global service) as default billdate instead of current daftate
+4. AppGlobalsService created with:
+   - mtodaydate signal to store today's date from logfile
+   - setMtodaydate() method to update the value
+Build successful. Implemented:
+1. Day End button: 
+   - Deletes sales data where billdate = selected date
+   - Updates logfile status=true for current date
+   - Creates new logfile record for next day with status=false
+   - Sets global mtodaydate to next day's date
+   - Logs out and redirects to login
+2. Login: Loads mtodaydate from egcsheet1_logfile where status=false and sets global
+3. Sale Invoice: Uses global mtodaydate as default billdate instead of current date

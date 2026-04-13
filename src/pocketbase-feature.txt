@@ -1,0 +1,84 @@
+PocketBase is an open-source backend written in Go that provides:
+Core Features:
+- Embedded SQLite Database - Single-file SQLite with realtime subscriptions
+- Built-in Authentication - Email/password, OAuth2 (Google, GitHub, etc.), magic links
+- Admin Dashboard - Web UI at /_/ for managing data
+- REST API - RESTful API at /api/ for CRUD operations
+- Realtime Subscriptions - Live updates via Server-Sent Events (SSE)
+Data & Storage:
+- Collections with schema fields (text, number, bool, date, file, relation, etc.)
+- File upload and handling
+- Relational data support
+- API rules and filters for access control
+Extensibility:
+- Go extensions - Custom hooks, routing, migrations, jobs scheduling
+- JavaScript extensions - Similar capabilities via JS VM
+- Custom console commands
+- Email sending
+- Template rendering
+- HTTP requests
+Development:
+- Single executable (~12MB)
+- Self-hosted
+- Migrations system
+- Logging
+- Testing utilities
+SDKs:
+- JavaScript SDK
+- Dart/Flutter SDK
+Use Cases:
+- Lightweight backend for web/mobile apps
+- Prototyping
+- Small-to-medium projects
+- Local-first applications
+The current version is v0.36.8 (as of early 2026). 
+It's NOT recommended for production-critical applications yet (pre-v1.0).
+
+-- - - - - - -  - - - - - - - - - - - - - -
+Thinking: The user is experiencing delay when saving data to PocketBase hosted on a remote server. This is a common issue that could have several causes. Let me provide some troubleshooting steps and potential solutions.
+Delays when saving data to a remote PocketBase instance can be caused by:
+Network latency
+- Distance between client and server
+- Check with ping <server-ip> or curl timing
+Possible causes & fixes:
+1. File uploads - If saving involves files, they're being uploaded over network
+   - Solution: Upload to local PB instance first, then sync
+2. Large payloads - Big JSON objects take time to transfer
+   - Solution: Optimize by sending only changed fields using PATCH instead of PUT
+3. Realtime subscriptions - If subscribing to many streams, it can slow things down
+   - Solution: Subscribe only to needed collections
+4. Server resources - Remote server might be underpowered
+   - Solution: Check server CPU/memory/disk I/O
+5. Database size - Large collections slow queries
+   - Solution: Add indexes to frequently filtered fields
+
+Debugging:
+// Measure save time
+const start = performance.now();
+await pb.collection('users').create(data);
+console.log('Save time:', performance.now() - start, 'ms');
+Quick fix - If using PocketBase SDK, enable local caching:
+pb.collection('users').subscribe('*', { async: true });
+What's your typical save latency, and are you uploading files?
+
+ - - - - - -  - - - - - - -  - - - - - 
+PocketBase has a batch API. Let me summarize it for the user.
+PocketBase has a Batch API at POST /api/batch. It must be enabled in Dashboard > Settings > Application first.
+JavaScript SDK usage:
+const batch = pb.createBatch();
+batch.collection('users').create({ name: 'John' });
+batch.collection('users').create({ name: 'Jane' });
+batch.collection('posts').update('RECORD_ID', { title: 'Updated' });
+batch.collection('items').delete('RECORD_ID');
+batch.collection('products').upsert({ id: 'EXISTING_ID', name: 'Product' });
+const result = await batch.send();
+
+Key points:
+- Single transaction - all requests succeed or fail together
+- Supports: create, update, upsert, delete
+- Can mix different collections in one batch
+- File uploads supported via multipart/form-data
+- Custom per-request headers NOT supported (same auth for all)
+- Enable limits in settings to prevent abuse
+Performance note: Since it runs in a single read-write transaction, 
+it can queue other queries - use small batch sizes and time limits.

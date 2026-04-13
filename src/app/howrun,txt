@@ -1,0 +1,12 @@
+After building, share these to the recipient:
+1. The built app:
+dist/gcsheet/browser/   (entire folder - contains index.html + all JS/CSS)
+2. If using PocketBase backend:
+- Download PocketBase from https://pocketbase.io
+- Share pocketbase.exe (or create a batch file to run it)
+3. Optional - setup batch file:
+Create a start.bat like your gcsheet.bat:
+@echo off
+cd /d "%~dp0"
+pocketbase serve
+start index.html

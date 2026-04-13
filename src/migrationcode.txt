@@ -1,0 +1,25 @@
+Thinking: Good, the script is ready. Let me provide the user with the script location and usage instructions.
+Script saved to migrate-pocketbase.js
+Usage:
+node migrate-pocketbase.js
+Configuration: Edit the top of the file to set your source and destination:
+const LOCAL_CONFIG = {
+  url: 'http://127.0.0.1:8090',
+  email: 'admin@local.com',
+  password: 'password123'
+};
+const REMOTE_CONFIG = {
+  url: 'https://your-remote.pockethost.io/',
+  email: 'admin@remote.com',
+  password: 'password123'
+};
+// Set prefix to migrate specific tables (empty = all)
+const COLLECTION_PREFIX = 'egcsheet';
+Features:
+- Connects to both local and remote PocketBase
+- Lists all matching collections with field details
+- Deletes existing collections on remote (to ensure clean migration)
+- Creates collections with proper field definitions
+- Migrates all records with error handling
+- Shows progress and summary
+▣  Build · big-pickle · 39.5s
