@@ -5,6 +5,7 @@ import { Router } from '@angular/router';
 import { AgGridAngular } from 'ag-grid-angular';
 import { ColDef } from 'ag-grid-community';
 import { GcsheetSaleinvService } from '../../services/gcsheet-saleinv.service';
+import { DmsLogfileService } from '../../services/dms-logfile.service';
 import { ToastService } from '../../shared/toast/toast.service';
 
 type GstReportType = 'invoice' | 'saleregister' | 'productsales';
@@ -167,6 +168,7 @@ type GstReportType = 'invoice' | 'saleregister' | 'productsales';
 export class Gcsheet1SalereportComponent implements OnInit {
   private service = inject(GcsheetSaleinvService);
   private router = inject(Router);
+  private pbService = inject(DmsLogfileService);
   protected toastService = inject(ToastService);
 
   isCollapsed = true;
@@ -285,14 +287,19 @@ export class Gcsheet1SalereportComponent implements OnInit {
   });
 
   ngOnInit() {
-    this.initDates();
-    this.loadGstData();
+    this.initDates().then(() => this.loadGstData());
   }
 
-  initDates() {
-    const today = new Date().toISOString().split('T')[0];
-    this.gstStartDate.set(today);
-    this.gstEndDate.set(today);
+  async initDates() {
+    const todaydate = await this.pbService.getLogfileTodayDate();
+    if (todaydate) {
+      this.gstStartDate.set(todaydate);
+      this.gstEndDate.set(todaydate);
+    } else {
+      const today = new Date().toISOString().split('T')[0];
+      this.gstStartDate.set(today);
+      this.gstEndDate.set(today);
+    }
   }
 
   onGstReportTypeChange(type: GstReportType) {

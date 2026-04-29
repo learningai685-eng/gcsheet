@@ -6,6 +6,7 @@ import { Router } from '@angular/router';
 import { GcsheetSaleinvService } from '../../services/gcsheet-saleinv.service';
 import { ToastService } from '../../shared/toast/toast.service';
 import { PaginationComponent } from '../../shared/pagination/pagination.component';
+import { AppGlobalsService } from '../../services/app-globals.service';
 
 @Component({
   selector: 'app-gcsheet-saleinvcopy',
@@ -455,6 +456,7 @@ export class GcsheetSaleinvComponent implements OnInit {
   private fb = inject(FormBuilder);
   private router = inject(Router);
   protected toastService = inject(ToastService);
+  private globals = inject(AppGlobalsService);
 
   @ViewChild('pktnameInput') pktnameInput!: ElementRef<HTMLInputElement>;
   @ViewChild('productSearchInput') productSearchInput!: ElementRef<HTMLInputElement>;
@@ -997,40 +999,41 @@ addDetail() {
     this.detailsTrigger.update(v => v + 1);
   }
 
-  async openAddModal() {
-    this.isEditMode.set(false);
-    this.currentInvoice.set(null);
-    this.formError.set(null);
-    this.other1Amt.set(0);
-    this.other2Amt.set(0);
-    this.loadAmt.set(0);
-    this.gstPer.set(0);
-    this.productQuery.set('');
-    this.showProductDropdown.set(false);
-    
-    this.detailsArray.clear();
-    this.pktQueries.set(new Map());
-    this.showPktDropdowns.set(new Map());
-    this.highlightedPktIndices.set(new Map());
-    
-    const maxBillno = await this.service.getMaxBillno();
-    const today = new Date().toISOString().split('T')[0];
-    
-    this.headerForm.patchValue({
-      billno: maxBillno,
-      billdate: today,
-      customername: '',
-      deliverylocation: '',
-      truckno: '',
-      transportation: '',
-      narration: '',
-      other1_desp: '',
-      other2_desp: ''
-    });
-    
-    this.showForm.set(true);
-    this.focusCustomerName();
-  }
+    async openAddModal() {
+     this.isEditMode.set(false);
+     this.currentInvoice.set(null);
+     this.formError.set(null);
+     this.other1Amt.set(0);
+     this.other2Amt.set(0);
+     this.loadAmt.set(0);
+     this.gstPer.set(0);
+     this.productQuery.set('');
+     this.showProductDropdown.set(false);
+     
+     this.detailsArray.clear();
+     this.pktQueries.set(new Map());
+     this.showPktDropdowns.set(new Map());
+     this.highlightedPktIndices.set(new Map());
+     
+     const maxBillno = await this.service.getMaxBillno();
+     // Use global mtodaydate instead of current date
+     const today = this.globals.mtodaydate() || new Date().toISOString().split('T')[0];
+     
+     this.headerForm.patchValue({
+       billno: maxBillno,
+       billdate: today,
+       customername: '',
+       deliverylocation: '',
+       truckno: '',
+       transportation: '',
+       narration: '',
+       other1_desp: '',
+       other2_desp: ''
+     });
+     
+     this.showForm.set(true);
+     this.focusCustomerName();
+   }
 
   async openEditModal(inv: any) {
     this.isEditMode.set(true);

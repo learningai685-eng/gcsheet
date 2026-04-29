@@ -198,7 +198,7 @@ export class GcsheetSaleinvService {
   // ✅ LOGFILE METHODS
   async getLogfileTodayDate(): Promise<string> {
     const logfile = await this.getActiveLogfile();
-    return logfile?.date || '';
+    return logfile?.todaydate || logfile?.date || '';
   }
 
   async updateLogfileStatus(startDate: string): Promise<any> {

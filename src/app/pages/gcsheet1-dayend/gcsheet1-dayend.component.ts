@@ -8,7 +8,7 @@ import { GcsheetSaleinvService } from '../../services/gcsheet-saleinv.service';
 import { AuthService } from '../../services/auth.service';
 import { ToastService } from '../../shared/toast/toast.service';
 import { AppGlobalsService } from '../../services/app-globals.service';
-import { PocketbaseService } from '../../services/pocketbase.service';
+import { DmsLogfileService } from '../../services/dms-logfile.service';
 
 type GstReportType = 'invoice';
 
@@ -72,7 +72,13 @@ type GstReportType = 'invoice';
               <input type="date" class="form-control form-control-sm" style="width: 130px;" readonly
                      [ngModel]="gstStartDate()">
             </div>
-            <button class="btn btn-danger btn-sm" (click)="confirmDayEnd()" [disabled]="gstLoading() || gstInvoices().length === 0">
+            <button class="btn btn-outline-primary btn-sm" (click)="printSaleRegister()" [disabled]="gstLoading() || gstInvoices().length === 0">
+              <i class="bi bi-printer me-1"></i>Sale Register
+            </button>
+            <button class="btn btn-warning btn-sm" (click)="printAllInvoices()" [disabled]="gstLoading() || gstInvoices().length === 0">
+              <i class="bi bi-printer me-1"></i>Print All Sale Invoice
+            </button>
+            <button class="btn btn-danger btn-sm" (click)="confirmDayEnd()" [disabled]="gstLoading()">
               <i class="bi bi-calendar-check me-1"></i>Day End
             </button>
           </div>
@@ -145,7 +151,7 @@ export class Gcsheet1DayendComponent implements OnInit {
   private authService = inject(AuthService);
   private router = inject(Router);
   private globals = inject(AppGlobalsService);
-  private pbService = inject(PocketbaseService);
+  private pbService = inject(DmsLogfileService);
   protected toastService = inject(ToastService);
 
   isCollapsed = true;
@@ -186,19 +192,26 @@ export class Gcsheet1DayendComponent implements OnInit {
   async initDates() {
     this.gstLoading.set(true);
     try {
-      const todayDate = await this.service.getLogfileTodayDate();
-      console.log('Logfile todaydate:', todayDate);
-      if (todayDate) {
-        const normalized = this.normalizeDate(todayDate);
-        this.gstStartDate.set(normalized);
+      const todaydate = await this.pbService.getLogfileTodayDate();
+      if (todaydate) {
+        this.gstStartDate.set(todaydate);
+        this.globals.setMtodaydate(todaydate);
       } else {
-        const today = new Date().toISOString().split('T')[0];
-        this.gstStartDate.set(today);
+        const globalDate = this.globals.mtodaydate();
+        if (globalDate) {
+          const normalized = this.normalizeDate(globalDate);
+          this.gstStartDate.set(normalized);
+        } else {
+          const today = new Date().toISOString().split('T')[0];
+          this.gstStartDate.set(today);
+          this.globals.setMtodaydate(today);
+        }
       }
     } catch (e) {
       console.error('Error getting logfile date:', e);
       const today = new Date().toISOString().split('T')[0];
       this.gstStartDate.set(today);
+      this.globals.setMtodaydate(today);
     }
     await this.loadGstData();
     this.gstLoading.set(false);
@@ -270,22 +283,25 @@ export class Gcsheet1DayendComponent implements OnInit {
     this.gstLoading.set(true);
     try {
       const headersToDelete = this.gstHeadersAll();
-      for (const header of headersToDelete) {
-        await this.service.deleteSalesDetailsByBillno(header.id);
-        await this.service.deleteSalesHeader(header.id);
+      
+      if (headersToDelete.length > 0) {
+        for (const header of headersToDelete) {
+          await this.service.deleteSalesDetailsByBillno(header.id);
+          await this.service.deleteSalesHeader(header.id);
+        }
       }
 
-      await this.service.updateLogfileStatus(startDate);
-      await this.service.createLogfileNextDay(startDate);
+      await this.pbService.updateLogfileStatus(startDate);
+      await this.pbService.createLogfileNextDay(startDate);
 
-      const newLogfile = await this.service.getActiveLogfile();
+      const newLogfile = await this.pbService.getActiveLogfile();
       if (newLogfile) {
         const nextDate = this.normalizeDate(newLogfile['todaydate']);
         this.globals.setMtodaydate(nextDate);
       }
 
-      this.pbService.clearAuth();
-      this.service.clearCache();
+       this.authService.logout();
+       this.service.clearCache();
       this.toastService.success(`Day End completed. ${headersToDelete.length} invoice(s) deleted.`);
       this.closeDayEndModal();
       
@@ -310,6 +326,290 @@ export class Gcsheet1DayendComponent implements OnInit {
 
   private formatGridNumber(value: any): string {
     return (Number(value) || 0).toFixed(2);
+  }
+
+  private formatPrintDate(value: any): string {
+    const normalized = this.normalizeDate(value);
+    if (!normalized) return '';
+    const parts = normalized.split('-');
+    return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : normalized;
+  }
+
+  private formatIndianNumber(value: any, decimals = 2): string {
+    const num = Number(value) || 0;
+    return num.toLocaleString('en-IN', {
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals
+    });
+  }
+
+  private escapeHtml(value: any): string {
+    return String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  private openPrintWindow(html: string, title: string) {
+    const printWindow = window.open('', '_blank', 'width=1100,height=700');
+    if (!printWindow) {
+      this.toastService.error('Please allow popups to print');
+      return;
+    }
+    printWindow.document.open();
+    printWindow.document.write(html);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => {
+      printWindow.document.title = title;
+      printWindow.print();
+      setTimeout(() => printWindow.close(), 200);
+    }, 250);
+  }
+
+  async printSaleRegister() {
+    const invoices = this.gstInvoices();
+    if (invoices.length === 0) return;
+
+    const rowsHtml = invoices.map((row: any) => `
+      <tr>
+        <td style="border:1px solid #000;padding:4px;">${this.escapeHtml(String(row.billno || ''))}</td>
+        <td style="border:1px solid #000;padding:4px;">${this.escapeHtml(this.formatPrintDate(row.billdate))}</td>
+        <td style="border:1px solid #000;padding:4px;">${this.escapeHtml(row.customername || '')}</td>
+        <td style="border:1px solid #000;padding:4px;text-align:right;">${Number(row.totalpcs) || 0}</td>
+        <td style="border:1px solid #000;padding:4px;text-align:right;">${this.formatIndianNumber(row.totalwgt)}</td>
+        <td style="border:1px solid #000;padding:4px;text-align:right;">${this.formatIndianNumber(row.nettamount)}</td>
+      </tr>
+    `).join('');
+
+    let totalPcs = 0, totalWgt = 0, totalNet = 0;
+    for (const row of invoices) {
+      totalPcs += Number(row.totalpcs) || 0;
+      totalWgt += Number(row.totalwgt) || 0;
+      totalNet += Number(row.nettamount) || 0;
+    }
+
+    const totalRow = `<tr style="background:#e7f1ff;font-weight:bold;">
+      <td style="border:1px solid #000;padding:4px;">Total</td>
+      <td style="border:1px solid #000;padding:4px;"></td>
+      <td style="border:1px solid #000;padding:4px;"></td>
+      <td style="border:1px solid #000;padding:4px;text-align:right;">${totalPcs}</td>
+      <td style="border:1px solid #000;padding:4px;text-align:right;">${this.formatIndianNumber(totalWgt)}</td>
+      <td style="border:1px solid #000;padding:4px;text-align:right;">${this.formatIndianNumber(totalNet)}</td>
+    </tr>`;
+
+    const html = `
+      <html>
+        <head>
+          <title>Sale Register</title>
+          <style>
+            @page { size: A4 portrait; margin: 8mm; }
+            body { margin: 0; font-family: 'Times New Roman', serif; font-size: 10px; }
+            .header { text-align: center; border-bottom: 2px solid #000; padding: 8px 0; margin-bottom: 10px; }
+            .header h2 { margin: 0 0 4px 0; font-size: 16px; }
+            .header p { margin: 0; font-size: 10px; }
+            table { width: 100%; border-collapse: collapse; font-size: 10px; }
+            th, td { border: 1px solid #000; padding: 3px 4px; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h2>GCSheet - Sale Register</h2>
+            <p>Date: ${this.gstStartDate()}</p>
+            <p>Generated: ${new Date().toLocaleString()}</p>
+          </div>
+          <table>
+            <thead><tr>
+              <th style="border:1px solid #000;padding:4px;background:#e7f1ff;">Bill No</th>
+              <th style="border:1px solid #000;padding:4px;background:#e7f1ff;">Date</th>
+              <th style="border:1px solid #000;padding:4px;background:#e7f1ff;">Customer</th>
+              <th style="border:1px solid #000;padding:4px;background:#e7f1ff;">Pcs</th>
+              <th style="border:1px solid #000;padding:4px;background:#e7f1ff;">Weight</th>
+              <th style="border:1px solid #000;padding:4px;background:#e7f1ff;">Net Amt</th>
+            </tr></thead>
+            <tbody>${rowsHtml}${totalRow}</tbody>
+          </table>
+        </body>
+      </html>
+    `;
+    this.openPrintWindow(html, 'Sale Register');
+  }
+
+  private async getInvoiceDetailsWithPktname(headerId: string): Promise<any[]> {
+    const allDetails = this.gstDetailsAll();
+    const invoiceDetails = allDetails.filter(d => String(d['billno']) === String(headerId));
+    const pktmasterMap = this.pktmasterMap();
+    return invoiceDetails.map(detail => {
+      const pkt = pktmasterMap.get(detail['pktno']);
+      return { ...detail, pktname: pkt?.['pktname'] || detail['pktname'] || '', particulars: detail['particulars'] || pkt?.['pktname'] || '' };
+    });
+  }
+
+  private buildInvoiceHtml(invoice: any, details: any[], pageBreak: boolean): string {
+    const totalWgt = Number(invoice['totalwgt']) || 0;
+    const billAmt = Number(invoice['billamt']) || 0;
+    const netAmt = Number(invoice['nettamount']) || 0;
+    const other1Amt = Number(invoice['other1_amt']) || 0;
+    const other2Amt = Number(invoice['other2_amt']) || 0;
+    const loadAmt = Number(invoice['loadamt']) || 0;
+    const gstPer = Number(invoice['gstper']) || 0;
+    const gstAmt = Number(invoice['gstamt']) || 0;
+    const totalAmtBeforeGst = billAmt + loadAmt + other1Amt + other2Amt;
+    const customerLines = String(invoice['customername'] || '').split(/\r?\n|,/).map((x: string) => x.trim()).filter((x: string) => x);
+    const itemsHtml = details.map((detail: any, idx: number) => `
+      <tr>
+        <td class="c">${idx + 1}</td>
+        <td>${this.escapeHtml(detail.particulars || detail.pktname || '')}</td>
+        <td class="r">${Number(detail.qty) || 0}</td>
+        <td class="r">${this.formatIndianNumber(detail.weight, 2)}</td>
+        <td class="r">${this.formatIndianNumber(detail.rate, 2)}</td>
+        <td class="r">${this.formatIndianNumber(detail.amount, 2)}</td>
+      </tr>
+    `).join('');
+
+    const minRows = 16;
+    const blankRows = Math.max(0, minRows - details.length);
+    const blankRowsHtml = Array.from({ length: blankRows }).map(() => `
+      <tr class="blank-row"><td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td></tr>
+    `).join('');
+
+    return `
+      <div style="page-break-after:${pageBreak ? 'always' : 'auto'};">
+        <style>
+          @page { size: A4; margin: 8mm; }
+          body { font-family: 'Times New Roman', serif; font-size: 13px; color: #000; margin: 0; }
+          .sheet { width: 100%; border: 1px solid #000; }
+          .title-grid { width: 100%; border-collapse: collapse; table-layout: fixed; }
+          .title-grid td { border: 1px solid #000; padding: 3px 6px; }
+          .title { text-align: center; font-size: 30px; }
+          .page { text-align: right; width: 220px; }
+          .head-grid { width: 100%; border-collapse: collapse; table-layout: fixed; }
+          .head-grid td { border: 1px solid #000; vertical-align: top; }
+          .left-box { height: 142px; padding: 6px; }
+          .left-lines { line-height: 1.3; margin-top: 4px; }
+          .left-lines .name { margin-left: 42px; }
+          .left-lines .line { margin-left: 42px; }
+          .right-box table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+          .right-box td { border: 1px solid #000; padding: 2px 6px; font-size: 12px; }
+          table { width: 100%; border-collapse: collapse; }
+          th, td { border: 1px solid #000; padding: 2px 4px; }
+          th { font-weight: 400; text-align: center; }
+          .c { text-align: center; }
+          .r { text-align: right; }
+          .items { table-layout: fixed; border-collapse: separate; border-spacing: 0; border-left: 1px solid #000; border-top: 1px solid #000; }
+          .items th, .items td { border: 0 !important; border-right: 1px solid #000 !important; border-bottom: 1px solid #000 !important; }
+          .items th:nth-child(1), .items td:nth-child(1) { width: 5%; }
+          .items th:nth-child(2), .items td:nth-child(2) { width: 52%; }
+          .items th:nth-child(3), .items td:nth-child(3) { width: 10%; }
+          .items th:nth-child(4), .items td:nth-child(4) { width: 12%; }
+          .items th:nth-child(5), .items td:nth-child(5) { width: 10%; }
+          .items th:nth-child(6), .items td:nth-child(6) { width: 11%; }
+          .blank-row td { height: 22px; }
+          .totals-row { width: 100%; border-collapse: collapse; table-layout: fixed; }
+          .totals-row td { border: 1px solid #000; padding: 6px 8px; font-size: 13px; }
+          .totals-row .label { text-align: left; }
+          .totals-row .value { text-align: right; font-weight: 600; }
+          .bottom-wrap { width: 100%; border-collapse: collapse; table-layout: fixed; }
+          .bottom-wrap > tbody > tr > td { border: 1px solid #000; vertical-align: top; }
+          .left-bottom { height: 180px; padding: 6px; }
+          .left-bottom .narration { margin-bottom: 8px; }
+          .left-bottom .rupees { margin-top: 72px; font-size: 13px; }
+          .right-bottom table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+          .right-bottom td { border: 1px solid #000; padding: 6px; font-size: 13px; }
+          .right-bottom .slabel { text-align: left; }
+          .right-bottom .sval { text-align: right; font-weight: 600; }
+          .thanks { text-align: center; border-top: 1px solid #000; border-bottom: 1px solid #000; font-size: 13px; }
+          .sign-row { width: 100%; border-collapse: collapse; table-layout: fixed; }
+          .sign-row td { padding: 8px 12px; font-size: 13px; }
+          .sign-row td:last-child { text-align: right; }
+        </style>
+        <div class="sheet">
+          <table class="title-grid"><tr><td class="title">Estimate -new</td><td class="page">Page 1 of 1</td></tr></table>
+          <table class="head-grid"><tr>
+            <td style="width:62%"><div class="left-box">
+              <div><strong>M/s :</strong></div>
+              <div class="left-lines">
+                <div class="name"><strong>${this.escapeHtml(customerLines[0] || invoice['customername'] || '')}</strong></div>
+                ${(customerLines.slice(1).map((line: string) => `<div class="line">${this.escapeHtml(line)}</div>`).join('')) || '<div class="line">&nbsp;</div><div class="line">&nbsp;</div>'}
+              </div>
+            </div></td>
+            <td style="width:38%" class="right-box"><table>
+              <tr><td colspan="2" class="r"><strong>Date : ${this.escapeHtml(this.formatPrintDate(invoice['billdate']))}</strong></td></tr>
+              <tr><td style="width:45%">Truck No.</td><td><strong>${this.escapeHtml(invoice['truckno'] || '')}</strong></td></tr>
+              <tr><td>Transport :</td><td>${this.escapeHtml(invoice['transportation'] || '')}</td></tr>
+              <tr><td>Weight Slipno:</td><td>${this.escapeHtml(invoice['wgtslipno'] || '')}</td></tr>
+              <tr><td>Load Slipno:</td><td>${this.escapeHtml(invoice['loadslipno'] || '')}</td></tr>
+            </table></td>
+          </tr></table>
+          <table class="items"><thead><tr>
+            <th>no</th><th>Particulars</th><th>Pieces</th><th>Weight</th><th>Rate</th><th>Amount</th>
+          </tr></thead><tbody>${itemsHtml}${blankRowsHtml}</tbody></table>
+          <table class="totals-row"><tr>
+            <td class="label">Total  Pcs</td><td class="value">${Number(invoice['totalpcs']) || 0}</td>
+            <td class="label">Total  Kgs</td><td class="value">${this.formatIndianNumber(totalWgt, 2)}</td>
+            <td class="value">${this.formatIndianNumber(billAmt, 2)}</td>
+          </tr></table>
+          <table class="bottom-wrap"><tr>
+            <td style="width:62%" class="left-bottom">
+              <div class="narration"><strong>Narration : ${this.escapeHtml(invoice['narration'] || '')}</strong></div>
+              <div class="rupees"><strong>Rs:</strong> ${this.escapeHtml(this.amountInWords(netAmt).toLowerCase())} only</div>
+            </td>
+            <td style="width:38%" class="right-bottom"><table>
+              <tr><td class="slabel">Load Amt :</td><td class="sval">${this.formatIndianNumber(loadAmt, 2)}</td></tr>
+              <tr><td class="slabel">${this.escapeHtml(invoice['other1_desp'] || 'Other 1')} :</td><td class="sval">${this.formatIndianNumber(other1Amt, 2)}</td></tr>
+              <tr><td class="slabel">${this.escapeHtml(invoice['other2_desp'] || 'Other 2')} :</td><td class="sval">${this.formatIndianNumber(other2Amt, 2)}</td></tr>
+              <tr><td class="slabel">&nbsp;</td><td class="sval">&nbsp;</td></tr>
+              <tr><td class="slabel">Total Amount :</td><td class="sval">${this.formatIndianNumber(totalAmtBeforeGst, 2)}</td></tr>
+              <tr><td class="slabel">GST @ ${this.formatIndianNumber(gstPer, 2)} % :</td><td class="sval">${this.formatIndianNumber(gstAmt, 2)}</td></tr>
+              <tr><td class="slabel"><strong>Nett Amount :</strong></td><td class="sval"><strong>${this.formatIndianNumber(netAmt, 2)}</strong></td></tr>
+            </table></td>
+          </tr></table>
+          <div class="thanks">Thank you Visit Again</div>
+          <table class="sign-row"><tr><td>Checked By</td><td>Authorised Sign</td></tr></table>
+        </div>
+      </div>
+    `;
+  }
+
+  private amountInWords(num: number): string {
+    if (!num) return 'Zero';
+    const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten',
+      'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+    const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+    const convertChunk = (n: number): string => {
+      if (n < 20) return ones[n];
+      if (n < 100) return tens[Math.floor(n / 10)] + (n % 10 ? ` ${ones[n % 10]}` : '');
+      if (n < 1000) return ones[Math.floor(n / 100)] + ' Hundred' + (n % 100 ? ` ${convertChunk(n % 100)}` : '');
+      if (n < 100000) return convertChunk(Math.floor(n / 1000)) + ' Thousand' + (n % 1000 ? ` ${convertChunk(n % 1000)}` : '');
+      if (n < 10000000) return convertChunk(Math.floor(n / 100000)) + ' Lakh' + (n % 100000 ? ` ${convertChunk(n % 100000)}` : '');
+      return convertChunk(Math.floor(n / 10000000)) + ' Crore' + (n % 10000000 ? ` ${convertChunk(n % 10000000)}` : '');
+    };
+    const rupees = Math.floor(num);
+    const paise = Math.round((num - rupees) * 100);
+    const rupeesWord = convertChunk(rupees);
+    const paiseWord = paise > 0 ? convertChunk(paise) : '';
+    return paiseWord ? `${rupeesWord} Rupees and ${paiseWord} Paise` : `${rupeesWord} Rupees`;
+  }
+
+  async printAllInvoices() {
+    const invoices = this.gstInvoices();
+    if (invoices.length === 0) return;
+
+    this.gstLoading.set(true);
+    try {
+      const sections: string[] = [];
+      for (let i = 0; i < invoices.length; i++) {
+        const details = await this.getInvoiceDetailsWithPktname(invoices[i].id);
+        sections.push(this.buildInvoiceHtml(invoices[i], details, true));
+      }
+      this.openPrintWindow(`<html><head><title>GCSheet Invoices</title></head><body style="margin:0;">${sections.join('')}</body></html>`, 'GCSheet Invoices');
+    } catch (err: any) {
+      this.toastService.error(err.message || 'Failed to print invoices');
+    } finally {
+      this.gstLoading.set(false);
+    }
   }
 
   goToDashboard() { this.router.navigate(['/dashboard']); }

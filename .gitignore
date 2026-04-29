@@ -10,3 +10,15 @@ Thumbs.db
 # Environment
 .env
 .env.local
+
+# Temp/Generated
+*.zip
+*.js
+*.txt
+src/app/copy table.txt
+src/app/errot.txt
+src/app/pages/gcsheet-saleinv/gcsheet-saleinv.component copy 2.ts
+src/app/pages/gcsheet-saleinv/gcsheet.txt
+src/app/pages/gcsheet-saleinv/sales.txt
+src/app/pages/gcsheet1-salereport/report.txt
+src/notesai.txt

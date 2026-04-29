@@ -30,7 +30,7 @@ export class DmsLogfileService {
   async getLogfileTodayDate(): Promise<string> {
     try {
       const res = await this.pb
-        .collection('dms_logfile')
+        .collection('egcsheet1_logfile')
         .getList(1, 1, { filter: 'status=false', sort: '-created' });
 
       if (res.items.length > 0) {
@@ -50,7 +50,7 @@ export class DmsLogfileService {
   async getActiveLogfile(): Promise<any> {
     try {
       const res = await this.pb
-        .collection('dms_logfile')
+        .collection('egcsheet1_logfile')
         .getList(1, 1, { filter: 'status=false', sort: '-created' });
 
       if (res.items.length > 0) {
@@ -76,7 +76,7 @@ export class DmsLogfileService {
       nextDay.setDate(nextDay.getDate() + 1);
       const nextDayStr = nextDay.toISOString().split('T')[0];
 
-      const res = await this.pb.collection('dms_logfile').getList(1, 1, {
+      const res = await this.pb.collection('egcsheet1_logfile').getList(1, 1, {
         filter: `todaydate >= "${todaydate}" && todaydate < "${nextDayStr}"`,
         sort: '-created',
       });
@@ -86,7 +86,7 @@ export class DmsLogfileService {
       }
 
       const logfile = res.items[0] as any;
-      await this.pb.collection('dms_logfile').update(logfile.id, { status: true });
+       await this.pb.collection('egcsheet1_logfile').update(logfile.id, { status: true });
       return { success: true, error: '' };
     } catch (e: any) {
       const errorMsg = e?.response?.message || e?.message || 'Unknown error';
@@ -103,7 +103,7 @@ export class DmsLogfileService {
       nextDate.setDate(nextDate.getDate() + 1);
       const nextDateStr = nextDate.toISOString().split('T')[0];
 
-      await this.pb.collection('dms_logfile').create({
+         await this.pb.collection('egcsheet1_logfile').create({
         todaydate: nextDateStr,
         status: false,
       });
@@ -117,7 +117,7 @@ export class DmsLogfileService {
       const existing = await this.getActiveLogfile();
       if (!existing) {
         const today = new Date().toISOString().split('T')[0];
-        await this.pb.collection('dms_logfile').create({
+        await this.pb.collection('egcsheet1_logfile').create({
           todaydate: today,
           status: false,
         });
