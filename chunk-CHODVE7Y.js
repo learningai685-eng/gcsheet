@@ -1,0 +1,1 @@
+import{J as e,ca as o}from"./chunk-K6CD6SNP.js";var n=class t{mtodaydate=o("");setMtodaydate(a){this.mtodaydate.set(a)}static \u0275fac=function(r){return new(r||t)};static \u0275prov=e({token:t,factory:t.\u0275fac,providedIn:"root"})};export{n as a};
