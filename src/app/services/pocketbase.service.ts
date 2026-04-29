@@ -46,6 +46,13 @@ export class PocketbaseService {
   }
 
   async authenticate(): Promise<boolean> {
+    // Check if already authenticated and token is valid
+    if (this.pb.authStore.isValid) {
+      console.log('PB Service: using existing valid auth');
+      this._isAuthenticated.set(true);
+      return true;
+    }
+    
     console.log('PB Service: authenticate() called');
     if (this.authPromise) {
       console.log('PB Service: returning cached auth promise');
@@ -53,7 +60,10 @@ export class PocketbaseService {
     }
     
     console.log('PB Service: starting new authentication');
-    this.authPromise = this.doAuthenticate();
+    this.authPromise = this.doAuthenticate().finally(() => {
+      // Clear promise after completion to allow refresh
+      this.authPromise = null;
+    });
     return this.authPromise;
   }
 

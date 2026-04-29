@@ -16,7 +16,7 @@ import { PaginationComponent } from '../../shared/pagination/pagination.componen
     <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
       <div class="container-fluid">
         <a class="navbar-brand" (click)="goToDashboard()" style="cursor: pointer;">
-          <i class="bi bi-shield-check me-2"></i>SuperAdmin
+          <i class="bi bi-shield-check me-2"></i>GCSheet
         </a>
         <button class="navbar-toggler" type="button" (click)="isCollapsed = !isCollapsed">
           <span class="navbar-toggler-icon"></span>
@@ -27,15 +27,6 @@ import { PaginationComponent } from '../../shared/pagination/pagination.componen
               <a class="nav-link" (click)="goToDashboard()">
                 <i class="bi bi-speedometer2 me-1"></i> Dashboard
               </a>
-            </li>
-            <li class="nav-item dropdown">
-              <a class="nav-link dropdown-toggle" style="cursor: pointer;" (click)="toggleMasterMenu()">
-                <i class="bi bi-collection me-1"></i> Master
-              </a>
-              <ul class="dropdown-menu" [class.show]="showMasterMenu">
-                <li><a class="dropdown-item" (click)="navigateToUsers()"><i class="bi bi-people me-2"></i>User Master</a></li>
-                <li><a class="dropdown-item" (click)="navigateToGroupmaster()"><i class="bi bi-collection me-2"></i>Group Master</a></li>
-              </ul>
             </li>
             <li class="nav-item dropdown">
               <a class="nav-link dropdown-toggle" style="cursor: pointer;" (click)="toggleGcsheetMenu()">

@@ -63,8 +63,18 @@ export const routes: Routes = [
     canActivate: [authGuard]
   },
   {
+    path: 'gcsheet-ordinv',
+    loadComponent: () => import('./pages/gcsheet-ordinv/gcsheet-ordinv.component').then(m => m.GcsheetOrdinvComponent),
+    canActivate: [authGuard]
+  },
+  {
     path: 'gcsheet1-salereport',
     loadComponent: () => import('./pages/gcsheet1-salereport/gcsheet1-salereport.component').then(m => m.Gcsheet1SalereportComponent),
+    canActivate: [authGuard]
+  },
+  {
+    path: 'gcsheet1-orderreport',
+    loadComponent: () => import('./pages/gcsheet1-orderreport/gcsheet1-orderreport.component').then(m => m.Gcsheet1OrderreportComponent),
     canActivate: [authGuard]
   },
   {

@@ -9,7 +9,7 @@ import { ToastService } from '../../shared/toast/toast.service';
 import { TabAsEnterDirective } from '../../shared/directives/tab-as-enter.directive';
 
 @Component({
-  selector: 'app-gcsheet-pktmaster',
+  selector: 'app-gcsheet-pktmaster1',
   standalone: true,
   imports: [CommonModule, ReactiveFormsModule, FormsModule, TabAsEnterDirective],
   template: `
@@ -17,7 +17,7 @@ import { TabAsEnterDirective } from '../../shared/directives/tab-as-enter.direct
       <div class="container-fluid">
         <a class="navbar-brand" (click)="goToDashboard()" style="cursor: pointer;">
           <i class="bi bi-shield-check me-2"></i>
-          SuperAdmin
+          GCSheet
         </a>
         <button class="navbar-toggler" type="button" (click)="isCollapsed = !isCollapsed">
           <span class="navbar-toggler-icon"></span>

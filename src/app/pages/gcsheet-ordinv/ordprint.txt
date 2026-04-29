@@ -1,0 +1,20 @@
+Done. Removed bottom-wrap table and "Thank you Visit Again" row. Now print shows only:
+- Title row
+- Customer info (M/s, Date, Truck No, Transport)
+- Items table with totals
+- Checked By / Authorised Sign row
+
+
+Actually, looking at the code flow:
+1. User opens form, fills data, saves
+2. saveInvoice() is called 
+3. On success: shows toast, calls cancelForm()
+4. cancelForm() just sets showForm to false and clears details
+5. Table still has old data
+The user wants me to use signals to refresh the data. Let me add loadData() after successful save.
+Looking at the code, I see saveInvoice() calls cancelForm() on success but doesn't refresh the table data. The loadData() is only called in ngOnInit() and after delete. I'll add loadData() call after successful save.
+
+
+<ag-grid-angular
+    class="ag-theme-quartz"
+    style="height: 550px; wi

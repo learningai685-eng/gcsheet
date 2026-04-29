@@ -4,13 +4,13 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { AgGridAngular } from 'ag-grid-angular';
 import { ColDef } from 'ag-grid-community';
-import { GcsheetSaleinvService } from '../../services/gcsheet-saleinv.service';
+import { GcsheetOrdinvService } from '../../services/gcsheet-ordinv.service';
 import { ToastService } from '../../shared/toast/toast.service';
 
-type GstReportType = 'invoice' | 'saleregister' | 'productsales';
+type GstReportType = 'invoice' | 'saleregister' | 'productsales' | 'productbdetail';
 
 @Component({
-  selector: 'app-gcsheet1-salereport',
+  selector: 'app-gcsheet1-orderreport',
   standalone: true,
   imports: [CommonModule, FormsModule, AgGridAngular],
   template: `
@@ -43,7 +43,7 @@ type GstReportType = 'invoice' | 'saleregister' | 'productsales';
                 <li><hr class="dropdown-divider"></li>
                 <li><a class="dropdown-item" (click)="navigateToGcsheetPktmaster()"><i class="bi bi-collection me-2"></i>Packet Master</a></li>
                 <li><a class="dropdown-item" (click)="navigateToGcsheetSaleinv()"><i class="bi bi-receipt me-2"></i>Sale Invoice</a></li>
-                <li><a class="dropdown-item active" style="color: #0d6efd; font-weight: 500;"><i class="bi bi-file-earmark-bar-graph me-2"></i>Sale Report</a></li>
+                <li><a class="dropdown-item active" style="color: #0d6efd; font-weight: 500;"><i class="bi bi-file-earmark-bar-graph me-2"></i>Order Report</a></li>
                 <li><a class="dropdown-item" (click)="navigateToGcsheetDayend()"><i class="bi bi-calendar-check me-2"></i>Day End</a></li>
               </ul>
             </li>
@@ -80,12 +80,17 @@ type GstReportType = 'invoice' | 'saleregister' | 'productsales';
               <option value="invoice">Print Invoice</option>
               <option value="saleregister">Sale Register</option>
               <option value="productsales">Product Summary</option>
+              <option value="productbdetail">Product Order-Detail</option>
             </select>
             <button class="btn btn-primary btn-sm" (click)="loadGstData()">
               <i class="bi bi-check-circle me-1"></i>Load
             </button>
             <button class="btn btn-outline-success btn-sm" (click)="exportGstReport()" [disabled]="gstInvoices().length === 0">
               <i class="bi bi-file-earmark-excel me-1"></i>Export
+            </button>
+            <input type="file" #fileInput (change)="importGstData($event)" accept=".csv" style="display: none;">
+            <button class="btn btn-outline-secondary btn-sm" (click)="fileInput.click()" [disabled]="gstReportType() !== 'productbdetail'">
+              <i class="bi bi-file-earmark-import me-1"></i>Import
             </button>
             @if (gstReportType() === 'invoice') {
               <button class="btn btn-warning btn-sm" (click)="printAllInvoices()" [disabled]="gstInvoices().length === 0 || gstLoading()">
@@ -108,7 +113,7 @@ type GstReportType = 'invoice' | 'saleregister' | 'productsales';
           } @else {
             <ag-grid-angular
               class="ag-theme-quartz"
-              style="height: 450px; width: 100%;"
+              style="height: 550px; width: 100%;"
               [rowData]="gstInvoices()"
               [columnDefs]="currentGstConfig().columns"
               [defaultColDef]="defaultColDef"
@@ -116,12 +121,19 @@ type GstReportType = 'invoice' | 'saleregister' | 'productsales';
               [paginationPageSize]="20"
               [pinnedBottomRowData]="gstReportType() !== 'invoice' ? gstPinnedBottomRow() : []"
               [alwaysShowVerticalScroll]="true"
+              [rowHeight]="24"
+              [getRowId]="getRowId"
               (rowClicked)="onGstRowClicked($event)"
               [rowSelection]="gstReportType() === 'invoice' ? 'single' : undefined">
             </ag-grid-angular>
             @if (gstReportType() === 'invoice' && gstInvoices().length > 0) {
               <div class="alert alert-warning mb-0 mt-2">
                 <i class="bi bi-info-circle me-1"></i> Click on a row to print that invoice | Or use "Print All" to print all invoices
+              </div>
+            }
+            @if (gstReportType() === 'productbdetail' && gstInvoices().length > 0) {
+              <div class="alert alert-info mb-0 mt-2">
+                <i class="bi bi-info-circle me-1"></i> Click on + to expand bill details | Click on - to collapse
               </div>
             }
           }
@@ -162,10 +174,12 @@ type GstReportType = 'invoice' | 'saleregister' | 'productsales';
   styles: [`
     .navbar .dropdown-menu { position: absolute; }
     .dropdown-item.active { background-color: #f8f9fa; font-weight: 500; }
+    .product-group-row { background-color: #e3f2fd !important; }
+    .product-group-row-expanded { background-color: #bbdefb !important; }
   `]
 })
-export class Gcsheet1SalereportComponent implements OnInit {
-  private service = inject(GcsheetSaleinvService);
+export class Gcsheet1OrderreportComponent implements OnInit {
+  private service = inject(GcsheetOrdinvService);
   private router = inject(Router);
   protected toastService = inject(ToastService);
 
@@ -182,11 +196,12 @@ export class Gcsheet1SalereportComponent implements OnInit {
   gstDetailsAll = signal<any[]>([]);
   pktmasterList = signal<any[]>([]);
   showDayEndModal = signal(false);
+  expandedBillnos = signal<Set<string>>(new Set());
 
-  readonly defaultColDef: ColDef = { sortable: true, filter: true, resizable: true };
+  readonly defaultColDef: ColDef = { sortable: true, filter: true, resizable: true, flex: 1, minWidth: 80 };
 
   readonly invoiceReportConfig = {
-    title: 'Invoice List',
+    title: 'Order List',
     columns: [
       { field: 'billno', headerName: 'Bill No', width: 100 },
       { field: 'billdate', headerName: 'Date', width: 120 },
@@ -219,6 +234,46 @@ export class Gcsheet1SalereportComponent implements OnInit {
     ] as ColDef[]
   };
 
+  readonly productBillDetailConfig = {
+    title: 'Product Order-Detail',
+    columns: [
+      { 
+        field: 'expandToggle', 
+        headerName: '', 
+        width: 40, 
+        flex: 1,
+        maxWidth: 50,
+        cellRenderer: (params: any) => {
+          if (!params.data?._group) return '';
+          return params.data?.expanded ? '−' : '+';
+        }
+      },
+      { 
+        field: 'productname', 
+        headerName: 'Product', 
+        flex: 3,
+        minWidth: 120,
+        cellStyle: (params: any) => {
+          if (!params.data?._group) return null;
+          return params.data?.expanded 
+            ? { 'font-weight': 'bold', 'background-color': '#90caf9', 'cursor': 'pointer' }
+            : { 'font-weight': 'bold', 'background-color': '#e3f2fd', 'cursor': 'pointer' };
+        },
+        onCellClicked: (params: any) => {
+          if (params.data?._group) {
+            this.toggleExpand(params.data._product);
+          }
+        }
+      },
+      { field: 'billno', headerName: 'Bill No', flex: 1.5, minWidth: 60 },
+      { field: 'billdate', headerName: 'Date', flex: 1.5, minWidth: 80, valueFormatter: (params: any) => this.formatGridDate(params.value) },
+      { field: 'customername', headerName: 'Customer', flex: 2.5, minWidth: 100 },
+      { field: 'qty', headerName: 'Pcs', flex: 1, minWidth: 50, type: 'numericColumn', valueFormatter: (params: any) => this.formatGridNumber(params.value) },
+      { field: 'weight', headerName: 'Weight', flex: 1.5, minWidth: 70, type: 'numericColumn', valueFormatter: (params: any) => this.formatGridNumber(params.value) },
+      { field: 'amount', headerName: 'Amount', flex: 1.5, minWidth: 80, type: 'numericColumn', valueFormatter: (params: any) => this.formatGridNumber(params.value) }
+    ] as ColDef[]
+  };
+
   
 
   currentGstConfig = computed(() => {
@@ -226,6 +281,7 @@ export class Gcsheet1SalereportComponent implements OnInit {
       case 'invoice': return this.invoiceReportConfig;
       case 'saleregister': return this.saleRegisterConfig;
       case 'productsales': return this.productSummaryConfig;
+      case 'productbdetail': return this.productBillDetailConfig;
       default: return this.invoiceReportConfig;
     }
   });
@@ -261,15 +317,15 @@ export class Gcsheet1SalereportComponent implements OnInit {
       return [{ productname: 'Total', totalpcs, totalwgt, totalamt }];
     }
 
-    // if (type === 'salesregister') {
-    //   let totalpcs = 0, totalwgt = 0, totalamt = 0;
-    //   for (const row of data) {
-    //     totalpcs += Number(row.qty) || 0;
-    //     totalwgt += Number(row.weight) || 0;
-    //     totalamt += Number(row.amount) || 0;
-    //   }
-    //   return [{ billno: 'Total', productname: '', qty: totalpcs, weight: totalwgt, amount: totalamt }];
-    // }
+    if (type === 'productbdetail') {
+      let qty = 0, weight = 0, amount = 0;
+      for (const row of data) {
+        qty += Number(row.qty) || 0;
+        weight += Number(row.weight) || 0;
+        amount += Number(row.amount) || 0;
+      }
+      return [{ billno: 'Total', billdate: '', customername: '', productname: '', qty, weight, amount }];
+    }
     
     let totalpcs = 0, totalwgt = 0, totalnet = 0;
     for (const row of data) {
@@ -297,6 +353,9 @@ export class Gcsheet1SalereportComponent implements OnInit {
 
   onGstReportTypeChange(type: GstReportType) {
     this.gstReportType.set(type);
+    if (type !== 'productbdetail') {
+      this.expandedBillnos.set(new Set());
+    }
     this.processGstData();
   }
 
@@ -306,8 +365,8 @@ export class Gcsheet1SalereportComponent implements OnInit {
     this.gstLoading.set(true);
     try {
       const [headers, details, pktmaster] = await Promise.all([
-        this.service.getSalesHeaderAll(),
-        this.service.getSalesDetailAll(),
+        this.service.getOrderHeaderAll(),
+        this.service.getOrderDetailAll(),
         this.service.getPktmasterAll()
       ]);
 
@@ -373,6 +432,80 @@ export class Gcsheet1SalereportComponent implements OnInit {
       this.gstInvoices.set(sortedProducts);
       return;
     }
+
+    if (type === 'productbdetail') {
+      const headerMap = new Map<string, any>();
+      for (const h of headers) {
+        if (h?.id) headerMap.set(h.id, h);
+      }
+      const expanded = this.expandedBillnos();
+      const productGroups = new Map<string, { items: any[], totalQty: number, totalWeight: number, totalAmount: number }>();
+      for (const det of details) {
+        const billNo = String(det['billno']);
+        const header = headerMap.get(billNo);
+        if (header) {
+          const productName = det['particulars'] || det['pktname'] || 'Unknown';
+          const item = {
+            billno: header['billno'],
+            billdate: header['billdate'],
+            customername: header['customername'],
+            productname: productName,
+            qty: Number(det.qty) || 0,
+            weight: Number(det.weight) || 0,
+            amount: Number(det.amount) || 0,
+            _parent: billNo
+          };
+          if (!productGroups.has(productName)) {
+            productGroups.set(productName, { items: [], totalQty: 0, totalWeight: 0, totalAmount: 0 });
+          }
+          const group = productGroups.get(productName)!;
+          group.items.push(item);
+          group.totalQty += item.qty;
+          group.totalWeight += item.weight;
+          group.totalAmount += item.amount;
+        }
+      }
+      const treeData: any[] = [];
+      const sortedProducts = Array.from(productGroups.keys()).sort((a, b) => a.localeCompare(b));
+      for (const productName of sortedProducts) {
+        const group = productGroups.get(productName)!;
+        if (expanded.has(productName)) {
+          treeData.push({
+            productname: '▼ ' + productName,
+            qty: group.totalQty,
+            weight: group.totalWeight,
+            amount: group.totalAmount,
+            _group: true,
+            expanded: true,
+            _product: productName
+          });
+          for (const item of group.items) {
+            treeData.push({
+              billno: item.billno,
+              billdate: item.billdate,
+              customername: item.customername,
+              productname: item.productname,
+              qty: item.qty,
+              weight: item.weight,
+              amount: item.amount,
+              expanded: false
+            });
+          }
+        } else {
+          treeData.push({
+            productname: '▶ ' + productName,
+            qty: group.totalQty,
+            weight: group.totalWeight,
+            amount: group.totalAmount,
+            _group: true,
+            expanded: false,
+            _product: productName
+          });
+        }
+      }
+      this.gstInvoices.set(treeData);
+      return;
+    }
     
     const sortedHeaders = [...headers].sort((a, b) => (Number(a['billno']) || 0) - (Number(b['billno']) || 0));
     this.gstInvoices.set(sortedHeaders);
@@ -398,6 +531,13 @@ export class Gcsheet1SalereportComponent implements OnInit {
       );
       const totals = this.gstPinnedBottomRow()[0] || {};
       rows.push(`"Total","${totals.totalpcs || 0}","${totals.totalwgt || 0}","${totals.totalamt || 0}"`);
+    } else if (type === 'productbdetail') {
+      headers = ['Bill No', 'Date', 'Customer', 'Product', 'Pcs', 'Weight', 'Amount'];
+      rows = data.map((row: any) => 
+        `"${row.billno || ''}","${this.formatPrintDate(row.billdate)}","${row.customername || ''}","${row.productname || ''}","${row.qty || 0}","${row.weight || 0}","${row.amount || 0}"`
+      );
+      const totals = this.gstPinnedBottomRow()[0] || {};
+      rows.push(`"Total","","","","${totals.qty || 0}","${totals.weight || 0}","${totals.amount || 0}"`);
     } else {
       const config = this.currentGstConfig();
       headers = config.columns.map(col => col.headerName || col.field || '');
@@ -420,6 +560,81 @@ export class Gcsheet1SalereportComponent implements OnInit {
     link.click();
   }
 
+  importGstData(event: Event) {
+    const input = event.target as HTMLInputElement;
+    if (!input.files?.length) return;
+    
+    const file = input.files[0];
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const text = e.target?.result as string;
+        const lines = text.split('\n');
+        if (lines.length < 2) {
+          this.toastService.error('CSV file is empty or invalid');
+          return;
+        }
+        const importedData: any[] = [];
+        for (let i = 1; i < lines.length; i++) {
+          const line = lines[i].trim();
+          if (!line) continue;
+          const matches = line.match(/("([^"]*)"|[^,]+)/g);
+          if (!matches || matches.length < 7) continue;
+          const values = matches.map(m => m.replace(/^"|"$/g, '').trim());
+          importedData.push({
+            billno: values[0],
+            billdate: this.parseImportDate(values[1]),
+            customername: values[2],
+            productname: values[3],
+            qty: Number(values[4]) || 0,
+            weight: Number(values[5]) || 0,
+            amount: Number(values[6]) || 0,
+            _group: false,
+            expanded: false
+          });
+        }
+        this.processImportedData(importedData);
+        this.toastService.success(`Imported ${importedData.length} records successfully`);
+      } catch (err: any) {
+        this.toastService.error('Failed to import CSV: ' + (err.message || 'Invalid format'));
+      }
+    };
+    reader.readAsText(file);
+    input.value = '';
+  }
+
+  private parseImportDate(value: string): string {
+    if (!value) return '';
+    if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+    if (/^\d{2}\/\d{2}\/\d{4}$/.test(value)) {
+      const parts = value.split('/');
+      return `${parts[2]}-${parts[1]}-${parts[0]}`;
+    }
+    return value;
+  }
+
+  private processImportedData(data: any[]) {
+    const headerMap = new Map<string, any>();
+    for (const d of data) {
+      const billNo = String(d.billno);
+      if (!billNo || billNo === 'Total') continue;
+      if (!headerMap.has(billNo)) {
+        headerMap.set(billNo, {
+          billno: d.billno,
+          billdate: d.billdate,
+          customername: d.customername,
+          _group: true,
+          expanded: false
+        });
+      }
+      const group = headerMap.get(billNo);
+      group.qty = (group.qty || 0) + d.qty;
+      group.weight = (group.weight || 0) + d.weight;
+      group.amount = (group.amount || 0) + d.amount;
+    }
+    this.gstInvoices.set(Array.from(headerMap.values()));
+  }
+
   printGstReport() {
     const data = this.gstInvoices();
     const type = this.gstReportType();
@@ -436,6 +651,16 @@ export class Gcsheet1SalereportComponent implements OnInit {
           <td style="border:1px solid #000;padding:4px;text-align:right;">${this.formatGridNumber(row.totalpcs)}</td>
           <td style="border:1px solid #000;padding:4px;text-align:right;">${this.formatGridNumber(row.totalwgt)}</td>
           <td style="border:1px solid #000;padding:4px;text-align:right;">${this.formatGridNumber(row.totalamt)}</td>
+        </tr>`);
+      } else if (type === 'productbdetail') {
+        rowsHtml.push(`<tr>
+          <td style="border:1px solid #000;padding:4px;">${this.escapeHtml(String(row.billno || ''))}</td>
+          <td style="border:1px solid #000;padding:4px;">${this.escapeHtml(this.formatPrintDate(row.billdate))}</td>
+          <td style="border:1px solid #000;padding:4px;">${this.escapeHtml(row.customername || '')}</td>
+          <td style="border:1px solid #000;padding:4px;">${this.escapeHtml(row.productname || '')}</td>
+          <td style="border:1px solid #000;padding:4px;text-align:right;">${this.formatGridNumber(row.qty)}</td>
+          <td style="border:1px solid #000;padding:4px;text-align:right;">${this.formatGridNumber(row.weight)}</td>
+          <td style="border:1px solid #000;padding:4px;text-align:right;">${this.formatGridNumber(row.amount)}</td>
         </tr>`);
       } else {
         rowsHtml.push(`<tr>
@@ -459,6 +684,16 @@ export class Gcsheet1SalereportComponent implements OnInit {
         <td style="border:1px solid #000;padding:4px;text-align:right;">${this.formatGridNumber(totals.totalwgt)}</td>
         <td style="border:1px solid #000;padding:4px;text-align:right;">${this.formatGridNumber(totals.totalamt)}</td>
       </tr>`;
+    } else if (type === 'productbdetail') {
+      totalRow = `<tr style="background:#e7f1ff;font-weight:bold;">
+        <td style="border:1px solid #000;padding:4px;">Total</td>
+        <td style="border:1px solid #000;padding:4px;"></td>
+        <td style="border:1px solid #000;padding:4px;"></td>
+        <td style="border:1px solid #000;padding:4px;"></td>
+        <td style="border:1px solid #000;padding:4px;text-align:right;">${this.formatGridNumber(totals.qty)}</td>
+        <td style="border:1px solid #000;padding:4px;text-align:right;">${this.formatGridNumber(totals.weight)}</td>
+        <td style="border:1px solid #000;padding:4px;text-align:right;">${this.formatGridNumber(totals.amount)}</td>
+      </tr>`;
     } else {
       totalRow = `<tr style="background:#e7f1ff;font-weight:bold;">
         <td style="border:1px solid #000;padding:4px;">Total</td>
@@ -473,6 +708,8 @@ export class Gcsheet1SalereportComponent implements OnInit {
     let theadHtml = '';
     if (type === 'productsales') {
       theadHtml = `<th style="border:1px solid #000;padding:4px;background:#e7f1ff;">Product</th><th style="border:1px solid #000;padding:4px;background:#e7f1ff;">Total Pcs</th><th style="border:1px solid #000;padding:4px;background:#e7f1ff;">Total Wgt</th><th style="border:1px solid #000;padding:4px;background:#e7f1ff;">Total Amt</th>`;
+    } else if (type === 'productbdetail') {
+      theadHtml = `<th style="border:1px solid #000;padding:4px;background:#e7f1ff;">Bill No</th><th style="border:1px solid #000;padding:4px;background:#e7f1ff;">Date</th><th style="border:1px solid #000;padding:4px;background:#e7f1ff;">Customer</th><th style="border:1px solid #000;padding:4px;background:#e7f1ff;">Product</th><th style="border:1px solid #000;padding:4px;background:#e7f1ff;">Pcs</th><th style="border:1px solid #000;padding:4px;background:#e7f1ff;">Weight</th><th style="border:1px solid #000;padding:4px;background:#e7f1ff;">Amount</th>`;
     } else {
       theadHtml = `<th style="border:1px solid #000;padding:4px;background:#e7f1ff;">Bill No</th><th style="border:1px solid #000;padding:4px;background:#e7f1ff;">Date</th><th style="border:1px solid #000;padding:4px;background:#e7f1ff;">Customer</th><th style="border:1px solid #000;padding:4px;background:#e7f1ff;">${type === 'invoice' ? 'Bill Amt' : 'Pcs'}</th><th style="border:1px solid #000;padding:4px;background:#e7f1ff;">${type === 'invoice' ? 'GST Amt' : 'Weight'}</th><th style="border:1px solid #000;padding:4px;background:#e7f1ff;">Net Amt</th>`;
     }
@@ -563,8 +800,8 @@ export class Gcsheet1SalereportComponent implements OnInit {
     try {
       const headersToDelete = this.gstHeadersAll();
       for (const header of headersToDelete) {
-        await this.service.deleteSalesDetailsByBillno(header.id);
-        await this.service.deleteSalesHeader(header.id);
+        await this.service.deleteOrderDetailsByBillno(header.id);
+        await this.service.deleteOrderHeader(header.id);
       }
       this.toastService.success(`Day End completed. ${headersToDelete.length} invoice(s) deleted.`);
       this.closeDayEndModal();
@@ -809,6 +1046,15 @@ export class Gcsheet1SalereportComponent implements OnInit {
     return (Number(value) || 0).toFixed(2);
   }
 
+  private formatGridDate(value: any): string {
+    if (!value) return '';
+    const text = String(value);
+    const normalized = text.includes('T') ? text.split('T')[0] : text.split(' ')[0];
+    if (!normalized) return '';
+    const parts = normalized.split('-');
+    return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : normalized;
+  }
+
   private formatPrintDate(value: any): string {
     const normalized = this.normalizeDate(value);
     if (!normalized) return '';
@@ -882,7 +1128,21 @@ export class Gcsheet1SalereportComponent implements OnInit {
   navigateToGcsheetNali() { this.router.navigate(['/gcsheet-nali']); }
   navigateToGcsheetPktmaster() { this.router.navigate(['/gcsheet-pktmaster']); }
   navigateToGcsheetSaleinv() { this.router.navigate(['/gcsheet-saleinv']); }
+  navigateToGcsheetOrderreport() { this.router.navigate(['/gcsheet1-orderreport']); }
   navigateToGcsheetDayend() { this.router.navigate(['/gcsheet1-dayend']); }
   toggleMasterMenu() { this.showMasterMenu = !this.showMasterMenu; }
   toggleGcsheetMenu() { this.showGcsheetMenu = !this.showGcsheetMenu; }
+  toggleExpand(billno: string) {
+    const expanded = new Set(this.expandedBillnos());
+    if (expanded.has(billno)) {
+      expanded.delete(billno);
+    } else {
+      expanded.add(billno);
+    }
+    this.expandedBillnos.set(expanded);
+    this.processGstData();
+  }
+  getRowId(params: any): string {
+    return params.data.billno + '_' + params.data.productname;
+  }
 }

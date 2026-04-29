@@ -3,12 +3,12 @@ import { CommonModule, DatePipe, DecimalPipe } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, FormGroup, Validators, FormArray, FormControl } from '@angular/forms';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
-import { GcsheetSaleinvService } from '../../services/gcsheet-saleinv.service';
+import { GcsheetOrdinvService } from '../../services/gcsheet-ordinv.service';
 import { ToastService } from '../../shared/toast/toast.service';
 import { PaginationComponent } from '../../shared/pagination/pagination.component';
 
 @Component({
-  selector: 'app-gcsheet-saleinvcopy',
+  selector: 'app-gcsheet-ordinv',
   standalone: true,
   imports: [CommonModule, ReactiveFormsModule, FormsModule, PaginationComponent, DatePipe, DecimalPipe],
   template: `
@@ -40,8 +40,8 @@ import { PaginationComponent } from '../../shared/pagination/pagination.componen
                 <li><a class="dropdown-item" (click)="navigateToGcsheetNali()"><i class="bi bi-geo-alt me-2"></i>Nali</a></li>
                 <li><hr class="dropdown-divider"></li>
                 <li><a class="dropdown-item" (click)="navigateToGcsheetPktmaster()"><i class="bi bi-collection me-2"></i>Packet Master</a></li>
-                <li><a class="dropdown-item active" style="color: #0d6efd; font-weight: 500;"><i class="bi bi-receipt me-2"></i>Sale Invoice</a></li>
-                <li><a class="dropdown-item" (click)="navigateToGcsheetSalereport()"><i class="bi bi-file-earmark-bar-graph me-2"></i>Sale Report</a></li>
+                <li><a class="dropdown-item active" style="color: #0d6efd; font-weight: 500;"><i class="bi bi-receipt me-2"></i>Order Invoice</a></li>
+                <li><a class="dropdown-item" (click)="navigateToGcsheetOrderreport()"><i class="bi bi-file-earmark-bar-graph me-2"></i>Order Report</a></li>
               </ul>
             </li>
           </ul>
@@ -60,12 +60,12 @@ import { PaginationComponent } from '../../shared/pagination/pagination.componen
       @if (!showForm()) {
         <div class="card">
           <div class="card-header bg-primary text-white">
-            <h4 class="mb-0"><i class="bi bi-receipt me-2"></i>Gcsheet Sale Invoice</h4>
+            <h4 class="mb-0"><i class="bi bi-receipt me-2"></i>Gcsheet Order Invoice</h4>
           </div>
           <div class="card-body pt-2">
             <div class="d-flex justify-content-between align-items-center mt-2">
               <button class="btn btn-primary btn-sm" (click)="openAddModal()">
-                <i class="bi bi-plus-circle me-1"></i>New Invoice
+                <i class="bi bi-plus-circle me-1"></i>New Order
               </button>
               <div class="input-group" style="width: 300px;">
                 <span class="input-group-text"><i class="bi bi-search"></i></span>
@@ -84,10 +84,9 @@ import { PaginationComponent } from '../../shared/pagination/pagination.componen
                 <table class="table table-hover">
                   <thead class="table-light">
                     <tr>
-                      <th>Bill No</th>
-                      <th>Bill Date</th>
+                      <th>Order No</th>
+                      <th>Order Date</th>
                       <th>Customer</th>
-                      <th>Truck No</th>
                       <th>Total Pcs</th>
                       <th>Total Wgt</th>
                       <th>Net Amount</th>
@@ -100,7 +99,6 @@ import { PaginationComponent } from '../../shared/pagination/pagination.componen
                         <td>{{ inv['billno'] }}</td>
                         <td>{{ formatDateForInput(inv['billdate']) | date:'dd-MM-yyyy' }}</td>
                         <td>{{ inv['customername'] }}</td>
-                        <td>{{ inv['truckno'] }}</td>
                         <td class="text-end">{{ inv['totalpcs'] }}</td>
                         <td class="text-end">{{ inv['totalwgt'] | number:'1.2-2' }}</td>
                         <td>{{ inv['nettamount'] | number:'1.2-2' }}</td>
@@ -117,7 +115,7 @@ import { PaginationComponent } from '../../shared/pagination/pagination.componen
                         </td>
                       </tr>
                     } @empty {
-                      <tr><td colspan="8" class="text-center text-muted">No invoices found</td></tr>
+                      <tr><td colspan="7" class="text-center text-muted">No invoices found</td></tr>
                     }
                   </tbody>
                 </table>
@@ -134,7 +132,7 @@ import { PaginationComponent } from '../../shared/pagination/pagination.componen
       } @else {
         <div class="card">
           <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-            <h4 class="mb-0"><i class="bi bi-receipt me-2"></i>{{ isEditMode() ? 'Edit' : 'New' }} Sale Invoice</h4>
+            <h4 class="mb-0"><i class="bi bi-receipt me-2"></i>{{ isEditMode() ? 'Edit' : 'New' }} Order Invoice</h4>
             <div class="d-flex gap-2">
               <button type="button" class="btn btn-light btn-sm" (click)="cancelForm()">
                 <i class="bi bi-x-circle me-1"></i>Cancel
@@ -147,19 +145,6 @@ import { PaginationComponent } from '../../shared/pagination/pagination.componen
               </button>
             </div>
           </div>
-          @if (saveProgress()) {
-            <div class="card-header bg-info text-white py-1">
-              <div class="d-flex align-items-center">
-                <span class="me-2">Saving details...</span>
-                <div class="progress flex-grow-1" style="height: 8px;">
-                  <div class="progress-bar bg-white" 
-                       [style.width.%]="(saveProgress()!.current / saveProgress()!.total) * 100">
-                  </div>
-                </div>
-                <span class="ms-2">{{ saveProgress()!.current }}/{{ saveProgress()!.total }}</span>
-              </div>
-            </div>
-          }
           <div class="card-body">
             @if (formError()) {
               <div class="alert alert-danger">{{ formError() }}</div>
@@ -169,14 +154,14 @@ import { PaginationComponent } from '../../shared/pagination/pagination.componen
                 <div class="col-md-1">
                   <div class="form-floating">
                     <input type="number" class="form-control" formControlName="billno" id="billno" readonly placeholder=" ">
-                    <label for="billno">Bill No</label>
+                    <label for="billno">Order No</label>
                   </div>
                 </div>
                 <div class="col-md-2">
                   <div class="form-floating">
                     <input type="date" class="form-control" formControlName="billdate" id="billdate" placeholder=" "
                            (keydown.enter)="focusFieldById('customername', $event)">
-                    <label for="billdate">Bill Date</label>
+                    <label for="billdate">Order Date</label>
                   </div>
                 </div>
                 <div class="col-md-4">
@@ -196,7 +181,28 @@ import { PaginationComponent } from '../../shared/pagination/pagination.componen
               </div>
               <hr class="my-1">
               <div class="row g-2">
-                <div class="col-md-4">
+                <div class="col-md-2">
+                  <div class="form-floating">
+                    <input type="text" class="form-control" formControlName="truckno" id="truckno" placeholder=" "
+                           (keydown.enter)="focusFieldById('transportation', $event)">
+                    <label for="truckno">Truck No</label>
+                  </div>
+                </div>
+                <div class="col-md-2">
+                  <div class="form-floating">
+                    <input type="text" class="form-control" formControlName="transportation" id="transportation" placeholder=" "
+                           (keydown.enter)="focusFieldById('narration', $event)">
+                    <label for="transportation">Transportation</label>
+                  </div>
+                </div>
+                <div class="col-md-3">
+                  <div class="form-floating">
+                    <input type="text" class="form-control" formControlName="narration" id="narration" placeholder=" "
+                           (keydown.enter)="focusFieldById('productSearch', $event)">
+                    <label for="narration">Narration</label>
+                  </div>
+                </div>
+                <div class="col-md-5">
                   <div class="form-floating" style="height: 45px;">
                     <input type="text" class="form-control" id="productSearch" placeholder=" " style="height: 45px;"
                            [value]="productQuery()" (input)="onProductSearch($any($event.target).value)"
@@ -219,33 +225,12 @@ import { PaginationComponent } from '../../shared/pagination/pagination.componen
                     }
                   </div>
                 </div>
-                <div class="col-md-2">
-                  <div class="form-floating">
-                    <input type="text" class="form-control" formControlName="truckno" id="truckno" placeholder=" "
-                           (keydown.enter)="focusFieldById('transportation', $event)">
-                    <label for="truckno">Truck No</label>
-                  </div>
-                </div>
-                <div class="col-md-2">
-                  <div class="form-floating">
-                    <input type="text" class="form-control" formControlName="transportation" id="transportation" placeholder=" "
-                           (keydown.enter)="focusFieldById('narration', $event)">
-                    <label for="transportation">Transportation</label>
-                  </div>
-                </div>
-                <div class="col-md-3">
-                  <div class="form-floating">
-                    <input type="text" class="form-control" formControlName="narration" id="narration" placeholder=" "
-                           (keydown.enter)="focusFieldById('other1Desp', $event)">
-                    <label for="narration">Narration</label>
-                  </div>
-                </div>
               </div>
               <div formArrayName="details" class="mt-1">
-                <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
+                <div class="table-responsive" style="max-height: 450px; overflow-y: auto;">
                   <table class="table table-sm table-bordered">
                     <thead class="table-light">
-<tr>
+                      <tr>
                         <th style="width: 50px">Sr No</th>
                         <th style="width: 300px">Particulars</th>
                         <th style="width: 100px; text-align: right;">
@@ -274,7 +259,7 @@ import { PaginationComponent } from '../../shared/pagination/pagination.componen
                       @for (detail of detailsArray.controls; track detail; let i = $index) {
                         <tr [formGroupName]="i">
                           <td>{{ i + 1 }}</td>
-<td>
+                          <td>
                             <input type="text" class="form-control form-control-sm" formControlName="particulars" 
                                    placeholder="Particulars">
                           </td>
@@ -311,44 +296,10 @@ import { PaginationComponent } from '../../shared/pagination/pagination.componen
                 </div>
               </div>
               <div class="row g-2 mt-0 align-items-end compact-summary-row">
-                <div class="col-md-3">
+                <!-- <div class="col-md-3">
                   <div class="form-floating compact-floating">
-                    <input type="text" class="form-control" formControlName="other1_desp" id="other1Desp" placeholder=" "
-                           (keydown.enter)="focusFieldById('other1Amount', $event)">
-                    <label for="other1Desp">Other 1 Description</label>
-                  </div>
-                </div>
-                <div class="col-md-2">
-                  <div class="form-floating compact-floating">
-                    <input type="number" class="form-control" [ngModel]="other1Amt()" 
-                           (ngModelChange)="other1Amt.set(toNumber($event)); detailsTrigger.update(v => v + 1)" 
-                           [ngModelOptions]="{standalone: true}" id="other1Amount"
-                           (keydown.enter)="focusFieldById('loadAmt', $event)">
-                    <label for="other1Amount">Other 1 Amount</label>
-                  </div>
-                </div>
-                <div class="col-md-1">
-                  <div class="form-floating compact-floating">
-                    <input type="number" class="form-control" [ngModel]="loadAmt()" 
-                           (ngModelChange)="loadAmt.set(toNumber($event)); detailsTrigger.update(v => v + 1)" 
-                           [ngModelOptions]="{standalone: true}" id="loadAmt"
-                           (keydown.enter)="focusFieldById('gstPer', $event)">
-                    <label for="loadAmt">Load Amt</label>
-                  </div>
-                </div>
-                <div class="col-md-1">
-                  <div class="form-floating compact-floating">
-                    <input type="number" class="form-control" [ngModel]="gstPer()" 
-                           (ngModelChange)="gstPer.set(toNumber($event)); detailsTrigger.update(v => v + 1)" 
-                           [ngModelOptions]="{standalone: true}" id="gstPer"
-                           (keydown.enter)="focusFieldById('other2Desp', $event)">
-                    <label for="gstPer">GST %</label>
-                  </div>
-                </div>
-                <div class="col-md-1">
-                  <div class="form-floating compact-floating">
-                    <input type="text" class="form-control text-end" [value]="gstAmt() | number:'1.2-2'" readonly id="gstAmt">
-                    <label for="gstAmt">GST Amount</label>
+                    <input type="text" class="form-control text-end" [value]="billAmount() | number:'1.2-2'" readonly id="billAmount">
+                    <label for="billAmount">Bill Amount</label>
                   </div>
                 </div>
                 <div class="col-md-1"></div>
@@ -357,25 +308,7 @@ import { PaginationComponent } from '../../shared/pagination/pagination.componen
                     <input type="text" class="form-control text-end" [value]="netAmount() | number:'1.2-2'" readonly id="netAmount">
                     <label for="netAmount">Net Amount</label>
                   </div>
-                </div>
-              </div>
-              <div class="row g-2 mt-1 align-items-end compact-summary-row second-compact-row">
-                <div class="col-md-3">
-                  <div class="form-floating compact-floating">
-                    <input type="text" class="form-control" formControlName="other2_desp" id="other2Desp" placeholder=" "
-                           (keydown.enter)="focusFieldById('other2Amount', $event)">
-                    <label for="other2Desp">Other 2 Description</label>
-                  </div>
-                </div>
-                <div class="col-md-2">
-                  <div class="form-floating compact-floating">
-                    <input type="number" class="form-control" [ngModel]="other2Amt()" 
-                           (ngModelChange)="other2Amt.set(toNumber($event)); detailsTrigger.update(v => v + 1)" 
-                           [ngModelOptions]="{standalone: true}" id="other2Amount"
-                           (keydown.enter)="focusProductSearch($event)">
-                    <label for="other2Amount">Other 2 Amount</label>
-                  </div>
-                </div>
+                </div> -->
               </div>
             </form>
           </div>
@@ -450,8 +383,8 @@ import { PaginationComponent } from '../../shared/pagination/pagination.componen
     }
   `]
 })
-export class GcsheetSaleinvComponent implements OnInit {
-  private service = inject(GcsheetSaleinvService);
+export class GcsheetOrdinvComponent implements OnInit {
+  private service = inject(GcsheetOrdinvService);
   private fb = inject(FormBuilder);
   private router = inject(Router);
   protected toastService = inject(ToastService);
@@ -473,12 +406,7 @@ export class GcsheetSaleinvComponent implements OnInit {
   currentInvoice = signal<any>(null);
   invoiceToDelete = signal<any>(null);
   formError = signal<string | null>(null);
-  other1Amt = signal<number>(0);
-  other2Amt = signal<number>(0);
-  loadAmt = signal<number>(0);
-  gstPer = signal<number>(0);
   detailsTrigger = signal(0);
-  saveProgress = signal<{ current: number; total: number } | null>(null);
   
   isCollapsed = true;
   showMasterMenu = false;
@@ -500,8 +428,6 @@ export class GcsheetSaleinvComponent implements OnInit {
     truckno: [''],
     transportation: [''],
     narration: [''],
-    other1_desp: [''],
-    other2_desp: [''],
     details: this.fb.array([])
   });
 
@@ -615,8 +541,7 @@ export class GcsheetSaleinvComponent implements OnInit {
     const term = this.searchTerm().toLowerCase();
     return this.invoices().filter(inv => 
       String(inv['billno'] || '').toLowerCase().includes(term) ||
-      (inv['customername'] || '').toLowerCase().includes(term) ||
-      (inv['truckno'] || '').toLowerCase().includes(term)
+      (inv['customername'] || '').toLowerCase().includes(term)
     );
   });
 
@@ -658,18 +583,8 @@ export class GcsheetSaleinvComponent implements OnInit {
     return this.detailsArray.controls.reduce((sum, ctrl) => sum + (parseFloat(ctrl.get('amount')?.value) || 0), 0);
   });
 
-  gstAmt = computed(() => {
-    const taxableAmount =
-      this.billAmount() +
-      this.toNumber(this.loadAmt()) +
-      this.toNumber(this.other1Amt()) +
-      this.toNumber(this.other2Amt());
-    const gstAmount = (taxableAmount * this.toNumber(this.gstPer())) / 100;
-    return this.roundTo2(gstAmount);
-  });
-
   netAmount = computed(() => {
-    return Math.round(this.billAmount() + this.toNumber(this.other1Amt()) + this.toNumber(this.other2Amt()) + this.toNumber(this.loadAmt()) + this.toNumber(this.gstAmt()));
+    return Math.round(this.billAmount());
   });
 
   ngOnInit() {
@@ -721,15 +636,15 @@ export class GcsheetSaleinvComponent implements OnInit {
     this.router.navigate(['/gcsheet-pktmaster']);
   }
 
-  navigateToGcsheetSalereport(): void {
-    this.router.navigate(['/gcsheet1-salereport']);
+  navigateToGcsheetOrderreport(): void {
+    this.router.navigate(['/gcsheet1-orderreport']);
   }
 
   async loadData() {
     this.loading.set(true);
     try {
       const [invoices, pktmaster] = await Promise.all([
-        this.service.getSalesHeaderAll(),
+        this.service.getOrderHeaderAll(),
         this.service.getPktmasterAll()
       ]);
       this.invoices.set(invoices);
@@ -803,7 +718,7 @@ export class GcsheetSaleinvComponent implements OnInit {
     this.highlightedPktIndices.set(indices);
   }
 
-selectPkt(index: number, pkt: any) {
+  selectPkt(index: number, pkt: any) {
     const qty = pkt['pcsperpkt'] || 0;
     this.detailsArray.at(index).patchValue({ 
       pktno: pkt.id, 
@@ -878,24 +793,6 @@ selectPkt(index: number, pkt: any) {
     }
   }
 
-  focusTruckno(event: Event) {
-    event.preventDefault();
-    const trucknoInput = document.getElementById('truckno') as HTMLInputElement;
-    if (trucknoInput) trucknoInput.focus();
-  }
-
-  focusProductSearchFromHeader(event: Event) {
-    event.preventDefault();
-    this.productSearchInput?.nativeElement?.focus();
-  }
-
-  focusCustomerName() {
-    setTimeout(() => {
-      const customerInput = document.getElementById('customername') as HTMLInputElement;
-      if (customerInput) customerInput.focus();
-    }, 100);
-  }
-
   focusWeight(index: number, event: Event) {
     event.preventDefault();
     const weightInputs = document.querySelectorAll('input[data-weight-index]');
@@ -910,7 +807,7 @@ selectPkt(index: number, pkt: any) {
     if (rateInput) rateInput.focus();
   }
 
-selectProduct(pkt: any) {
+  selectProduct(pkt: any) {
     const qty = pkt['pcsperpkt'] || 0;
     let targetIndex: number;
     
@@ -978,7 +875,7 @@ selectProduct(pkt: any) {
     this.detailsTrigger.update(v => v + 1);
   }
 
-addDetail() {
+  addDetail() {
     const detailGroup = this.fb.group({
       pktno: [''],
       pktname: [''],
@@ -1001,10 +898,6 @@ addDetail() {
     this.isEditMode.set(false);
     this.currentInvoice.set(null);
     this.formError.set(null);
-    this.other1Amt.set(0);
-    this.other2Amt.set(0);
-    this.loadAmt.set(0);
-    this.gstPer.set(0);
     this.productQuery.set('');
     this.showProductDropdown.set(false);
     
@@ -1023,13 +916,14 @@ addDetail() {
       deliverylocation: '',
       truckno: '',
       transportation: '',
-      narration: '',
-      other1_desp: '',
-      other2_desp: ''
+      narration: ''
     });
     
     this.showForm.set(true);
-    this.focusCustomerName();
+    setTimeout(() => {
+      const customerInput = document.getElementById('customername') as HTMLInputElement;
+      if (customerInput) customerInput.focus();
+    }, 100);
   }
 
   async openEditModal(inv: any) {
@@ -1044,41 +938,34 @@ addDetail() {
     this.showPktDropdowns.set(new Map());
     this.highlightedPktIndices.set(new Map());
     
-    this.headerForm.reset();
-    setTimeout(() => {
-      this.headerForm.patchValue({
-        billno: inv['billno'],
-        billdate: this.formatDateForInput(inv['billdate']),
-        customername: inv['customername'] || '',
-        deliverylocation: inv['deliverylocation'] || '',
-        truckno: inv['truckno'] || '',
-        transportation: inv['transportation'] || '',
-        narration: inv['narration'] || '',
-        other1_desp: inv['other1_desp'] || '',
-        other2_desp: inv['other2_desp'] || ''
-      });
-    }, 0);
+    const editData = inv;
     
-    this.other1Amt.set(inv['other1_amt'] || 0);
-    this.other2Amt.set(inv['other2_amt'] || 0);
-    this.loadAmt.set(inv['loadamt'] || 0);
-    this.gstPer.set(inv['gstper'] || 0);
+    this.headerForm.patchValue({
+      billno: editData['billno'],
+      billdate: this.formatDateForInput(editData['billdate']),
+      customername: editData['customername'] || '',
+      deliverylocation: editData['deliverylocation'] || '',
+      truckno: editData['truckno'] || '',
+      transportation: editData['transportation'] || '',
+      narration: editData['narration'] || ''
+    });
     
     try {
-      const details = await this.service.getSalesDetails(inv.id);
+      const details = await this.service.getOrderDetails(inv.id);
+      const pktmap = this.pktmasterMap();
+      
       if (details.length === 0) {
         this.addDetail();
       } else {
-for (const det of details) {
-          const pkt = this.pktmasterMap().get(det['pktno']);
+        for (const det of details) {
+          const pkt = pktmap.get(det['pktno']);
           const pktname = pkt ? pkt['pktname'] : '';
-          const particulars = det['particulars'] || pktname || '';
           
           const detailGroup = this.fb.group({
             id: [det['id'] || ''],
             pktno: [det['pktno'] || ''],
             pktname: [pktname || ''],
-            particulars: [particulars],
+            particulars: [det['particulars'] || pktname || ''],
             pktno_invalid: [false],
             qty: [det['qty'] || 0],
             weight: [det['weight'] || 0],
@@ -1093,7 +980,10 @@ for (const det of details) {
     }
     
     this.showForm.set(true);
-    this.focusCustomerName();
+    setTimeout(() => {
+      const customerInput = document.getElementById('customername') as HTMLInputElement;
+      if (customerInput) customerInput.focus();
+    }, 100);
   }
 
   cancelForm() {
@@ -1124,57 +1014,17 @@ for (const det of details) {
         truckno: headerData['truckno'],
         transportation: headerData['transportation'],
         narration: headerData['narration'],
-        other1_desp: headerData['other1_desp'],
-        other2_desp: headerData['other2_desp'],
         totalpcs: this.totalPcs(),
         totalwgt: this.totalWeight(),
         billamt: this.billAmount(),
-        other1_amt: this.other1Amt(),
-        other2_amt: this.other2Amt(),
-        loadamt: this.loadAmt(),
-        gstper: this.gstPer(),
-        gstamt: this.gstAmt(),
         nettamount: this.netAmount()
       };
-      
-      console.log('Raw form data:', headerData);
-      console.log('Saving header payload:', JSON.stringify(headerPayload, null, 2));
-      
-      let headerResult: any;
-      if (this.isEditMode()) {
-        try {
-          headerResult = await this.service.updateSalesHeader(this.currentInvoice().id, headerPayload);
-          headerResult = { success: true, record: headerResult };
-        } catch (err: any) {
-          this.formError.set(err.message || 'Failed to save header');
-          return;
-        }
-      } else {
-        try {
-          const createdRecord = await this.service.createSalesHeader(headerPayload);
-          console.log('Created record:', JSON.stringify(createdRecord, null, 2));
-          headerResult = { success: true, record: createdRecord };
-        } catch (err: any) {
-          this.formError.set(err.message || 'Failed to save header');
-          return;
-        }
-      }
-      
-      if (!headerResult.success) {
-        this.formError.set(headerResult.error || 'Failed to save header');
-        return;
-      }
-      
-      const headerId = this.isEditMode() ? this.currentInvoice().id : headerResult.record?.id;
-      
-await this.service.deleteSalesDetailsByBillno(headerId);
       
       const detailsToSave = [];
       for (let i = 0; i < this.detailsArray.length; i++) {
         const detail = this.detailsArray.at(i).value;
         if (detail['pktno'] && detail['qty']) {
           detailsToSave.push({
-            billno: headerId,
             pktno: detail['pktno'],
             srno: i + 1,
             particulars: detail['particulars'] || detail['pktname'] || '',
@@ -1186,19 +1036,24 @@ await this.service.deleteSalesDetailsByBillno(headerId);
         }
       }
       
-      if (detailsToSave.length > 0) {
-        try {
-          await this.service.createSalesDetailsBatch(detailsToSave, (done, total) => {
-            this.saveProgress.set({ current: done, total });
-          });
-        } catch (err: any) {
-          this.formError.set(err.message || 'Failed to save details');
-          this.saveProgress.set(null);
-          return;
+      let targetHeaderId: string;
+      
+      if (this.isEditMode() && this.currentInvoice()?.id) {
+        const headerId = this.currentInvoice().id;
+        await this.service.updateOrderHeader(headerId, headerPayload);
+        if (detailsToSave.length > 0) {
+          await this.service.deleteOrderDetailsByBillno(headerId);
         }
+        targetHeaderId = headerId;
+      } else {
+        const createdRecord = await this.service.createOrderHeader(headerPayload);
+        targetHeaderId = createdRecord.id;
       }
       
-      this.saveProgress.set(null);
+      if (targetHeaderId && detailsToSave.length > 0) {
+        await this.service.createOrderDetailsBatchWithBillno(targetHeaderId, detailsToSave);
+      }
+      
       this.toastService.success(`Invoice ${this.isEditMode() ? 'updated' : 'created'} successfully`);
       this.cancelForm();
       await this.loadData();
@@ -1210,175 +1065,26 @@ await this.service.deleteSalesDetailsByBillno(headerId);
   }
 
   async saveAndPrint() {
+    await this.saveInvoice();
+  }
+
+  printInvoiceFromList(inv: any) {
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
       this.toastService.error('Please allow popups to print');
       return;
     }
 
-    printWindow.document.write(`
-      <html>
-        <head><title>Preparing Invoice...</title></head>
-        <body style="font-family: Arial, sans-serif; padding: 24px;">Preparing invoice for print...</body>
-      </html>
-    `);
-    printWindow.document.close();
-
-    this.saving.set(true);
-    this.formError.set(null);
-    
-    const headerData = this.headerForm.value;
-    
-    for (let i = 0; i < this.detailsArray.length; i++) {
-      const detail = this.detailsArray.at(i);
-      if (!detail.get('pktno')?.value) {
-        this.formError.set(`Row ${i + 1}: Please select a valid packet`);
-        printWindow.close();
-        this.saving.set(false);
-        return;
-      }
-    }
-    
-    try {
-      const headerPayload = {
-        billno: parseInt(headerData['billno']),
-        billdate: headerData['billdate'],
-        customername: headerData['customername'],
-        deliverylocation: headerData['deliverylocation'],
-        truckno: headerData['truckno'],
-        transportation: headerData['transportation'],
-        narration: headerData['narration'],
-        other1_desp: headerData['other1_desp'],
-        other2_desp: headerData['other2_desp'],
-        totalpcs: this.totalPcs(),
-        totalwgt: this.totalWeight(),
-        billamt: this.billAmount(),
-        other1_amt: this.other1Amt(),
-        other2_amt: this.other2Amt(),
-        loadamt: this.loadAmt(),
-        gstper: this.gstPer(),
-        gstamt: this.gstAmt(),
-        nettamount: this.netAmount()
-      };
-      
-      let headerResult: any;
-      let headerId: string;
-      
-      if (this.isEditMode()) {
-        try {
-          headerResult = await this.service.updateSalesHeader(this.currentInvoice().id, headerPayload);
-          headerResult = { success: true, record: headerResult };
-        } catch (err: any) {
-          this.formError.set(err.message || 'Failed to save header');
-          printWindow.close();
-          this.saving.set(false);
-          return;
-        }
-        headerId = this.currentInvoice().id;
-      } else {
-        try {
-          headerResult = await this.service.createSalesHeader(headerPayload);
-          headerResult = { success: true, record: headerResult };
-        } catch (err: any) {
-          this.formError.set(err.message || 'Failed to save header');
-          printWindow.close();
-          this.saving.set(false);
-          return;
-        }
-        headerId = (headerResult as any).record?.id;
-      }
-      
-      if (!headerResult.success) {
-        this.formError.set((headerResult as any).error || 'Failed to save header');
-        printWindow.close();
-        this.saving.set(false);
-        return;
-      }
-
-      if (!headerId) {
-        this.formError.set('Invoice saved without a valid header id');
-        printWindow.close();
-        this.saving.set(false);
-        return;
-      }
-      
-await this.service.deleteSalesDetailsByBillno(headerId);
-      
-      const detailsToSave = [];
-      for (let i = 0; i < this.detailsArray.length; i++) {
-        const detail = this.detailsArray.at(i).value;
-        if (detail['pktno'] && detail['qty']) {
-          detailsToSave.push({
-            billno: headerId,
-            pktno: detail['pktno'],
-            srno: i + 1,
-            particulars: detail['particulars'] || detail['pktname'] || '',
-            qty: parseFloat(detail['qty']) || 0,
-            weight: parseFloat(detail['weight']) || 0,
-            rate: parseFloat(detail['rate']) || 0,
-            amount: parseFloat(detail['amount']) || 0
-          });
-        }
-      }
-      
-      if (detailsToSave.length > 0) {
-        try {
-          await this.service.createSalesDetailsBatch(detailsToSave, (done, total) => {
-            this.saveProgress.set({ current: done, total });
-          });
-        } catch (err: any) {
-          this.formError.set(err.message || 'Failed to save details');
-          this.saveProgress.set(null);
-          printWindow.close();
-          this.saving.set(false);
-          return;
-        }
-      }
-      
-      this.saveProgress.set(null);
-      this.toastService.success(`Invoice ${this.isEditMode() ? 'updated' : 'created'} successfully`);
-      
+    this.service.getOrderDetails(inv.id).then(details => {
       const printData = {
-        billno: headerPayload.billno,
-        billdate: headerPayload.billdate,
-        customername: headerPayload.customername,
-        deliverylocation: headerPayload.deliverylocation,
-        truckno: headerPayload.truckno,
-        transportation: headerPayload.transportation,
-        narration: headerPayload.narration,
-        other1_desp: headerPayload.other1_desp,
-        other2_desp: headerPayload.other2_desp,
-        details: this.detailsArray.controls.map((ctrl, i) => ({
-          srno: i + 1,
-          pktname: this.getPktname(i),
-          qty: ctrl.get('qty')?.value || 0,
-          weight: ctrl.get('weight')?.value || 0,
-          rate: ctrl.get('rate')?.value || 0,
-          amount: ctrl.get('amount')?.value || 0
-        })),
-        totalpcs: this.totalPcs(),
-        totalwgt: this.totalWeight(),
-        billamt: this.billAmount(),
-        other1_amt: this.other1Amt(),
-        other2_amt: this.other2Amt(),
-        loadamt: this.loadAmt(),
-        gstper: this.gstPer(),
-        gstamt: this.gstAmt(),
-        nettamount: this.netAmount()
+        ...inv,
+        details: details
       };
-      
-      this.cancelForm();
-      await this.loadData();
-      
-      setTimeout(() => {
-        this.printInvoice(printData, printWindow);
-      }, 100);
-    } catch (err: any) {
-      this.formError.set(err.message || 'Failed to save invoice');
+      this.printInvoice(printData, printWindow);
+    }).catch((err: any) => {
       printWindow.close();
-    } finally {
-      this.saving.set(false);
-    }
+      this.toastService.error('Failed to load invoice details');
+    });
   }
 
   printInvoice(data: any, printWindow?: Window | null) {
@@ -1393,26 +1099,19 @@ await this.service.deleteSalesDetailsByBillno(headerId);
       .map((x: string) => x.trim())
       .filter((x: string) => x);
 
-const itemsHtml = (data.details || []).map((d: any, idx: number) => {
+    const itemsHtml = (data.details || []).map((d: any, idx: number) => {
       const weight = Number(d.weight) || 0;
       const qty = Number(d.qty) || 0;
       const amount = Number(d.amount) || 0;
-      const pcsperpkt = Number(d.pcsperpkt) || 0;
-      let rowAvg = 0;
-      if (qty > 0 && weight > 0 && pcsperpkt > 0) {
-        rowAvg = (weight / qty) * pcsperpkt;
-      } else if (weight > 0 && amount > 0) {
-        rowAvg = amount / weight;
-      }
+      const rate = d.rate || (weight > 0 ? amount / weight : 0);
       return `
         <tr>
           <td class="c">${idx + 1}</td>
-          <td class="r">${this.formatIndianNumber(rowAvg, 2)}</td>
           <td>${this.escapeHtml(d.particulars || d.pktname || '')}</td>
           <td class="r">${this.formatQty(d.qty)}</td>
-          <td class="r">${this.formatIndianNumber(d.weight, 2)}</td>
-          <td class="r">${this.formatIndianNumber(d.rate, 2)}</td>
-          <td class="r">${this.formatIndianNumber(d.amount, 2)}</td>
+          <td class="r">${this.formatIndianNumber(weight, 2)}</td>
+          <td class="r">${this.formatIndianNumber(rate, 2)}</td>
+          <td class="r">${this.formatIndianNumber(amount, 2)}</td>
         </tr>
       `;
     }).join('');
@@ -1420,19 +1119,12 @@ const itemsHtml = (data.details || []).map((d: any, idx: number) => {
     const totalWgt = Number(data.totalwgt) || 0;
     const billAmt = Number(data.billamt) || 0;
     const netAmt = Number(data.nettamount) || 0;
-    const other1Amt = Number(data.other1_amt) || 0;
-    const other2Amt = Number(data.other2_amt) || 0;
-    const loadAmt = Number(data.loadamt) || 0;
-    const gstPer = Number(data.gstper) || 0;
-    const gstAmt = Number(data.gstamt) || 0;
-    const totalAmtBeforeGst = billAmt + loadAmt + other1Amt + other2Amt;
-    const avgRate = totalWgt > 0 ? netAmt / totalWgt : 0;
-    const totalBandl = Number(data.totalbandl) || Number(data.totalpcs) || 0;
+
     const minRows = 16;
     const blankRows = Math.max(0, minRows - (data.details?.length || 0));
     const blankRowsHtml = Array.from({ length: blankRows }).map(() => `
       <tr class="blank-row">
-        <td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
+        <td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td>
       </tr>
     `).join('');
 
@@ -1440,7 +1132,7 @@ const itemsHtml = (data.details || []).map((d: any, idx: number) => {
     targetWindow.document.write(`
       <html>
         <head>
-          <title>Invoice Print</title>
+          <title>Order Print</title>
           <style>
             @page { size: A4; margin: 8mm; }
             body { font-family: 'Times New Roman', serif; font-size: 13px; color: #000; margin: 0; }
@@ -1474,28 +1166,23 @@ const itemsHtml = (data.details || []).map((d: any, idx: number) => {
               border-right: 1px solid #000 !important;
               border-bottom: 1px solid #000 !important;
             }
-            .items th:nth-child(1), .items td:nth-child(1) { width: 3%; }
-            .items th:nth-child(2), .items td:nth-child(2) { width: 7%; }
-            .items th:nth-child(3), .items td:nth-child(3) { width: 48%; }
-            .items th:nth-child(4), .items td:nth-child(4) { width: 9%; }
-            .items th:nth-child(5), .items td:nth-child(5) { width: 9%; }
-            .items th:nth-child(6), .items td:nth-child(6) { width: 11%; }
-            .items th:nth-child(7), .items td:nth-child(7) { width: 13%; }
+            .items th:nth-child(1), .items td:nth-child(1) { width: 5%; }
+            .items th:nth-child(2), .items td:nth-child(2) { width: 50%; }
+            .items th:nth-child(3), .items td:nth-child(3) { width: 10%; }
+            .items th:nth-child(4), .items td:nth-child(4) { width: 12%; }
+            .items th:nth-child(5), .items td:nth-child(5) { width: 10%; }
+            .items th:nth-child(6), .items td:nth-child(6) { width: 13%; }
             .blank-row td { height: 22px; }
             .totals-row { width: 100%; border-collapse: collapse; table-layout: fixed; }
             .totals-row td { border: 1px solid #000; padding: 6px 8px; font-size: 13px; }
             .totals-row .label { text-align: left; }
             .totals-row .value { text-align: right; font-weight: 600; }
-            .bottom-wrap { width: 100%; border-collapse: collapse; table-layout: fixed; }
-            .bottom-wrap > tbody > tr > td { border: 1px solid #000; vertical-align: top; }
-            .left-bottom { height: 180px; padding: 6px; }
-            .left-bottom .narration { margin-bottom: 8px; }
-            .left-bottom .rupees { margin-top: 72px; font-size: 13px; }
-            .right-bottom table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-            .right-bottom td { border: 1px solid #000; padding: 6px; font-size: 13px; }
-            .right-bottom .slabel { text-align: left; }
-            .right-bottom .sval { text-align: right; font-weight: 600; }
-            .thanks { text-align: center; border-top: 1px solid #000; border-bottom: 1px solid #000; font-size: 13px; }
+            .totals-row td:nth-child(1) { width: 5%; }
+            .totals-row td:nth-child(2) { width: 50%; }
+            .totals-row td:nth-child(3) { width: 10%; }
+            .totals-row td:nth-child(4) { width: 12%; }
+            .totals-row td:nth-child(5) { width: 10%; }
+            .totals-row td:nth-child(6) { width: 13%; }
             .sign-row { width: 100%; border-collapse: collapse; table-layout: fixed; }
             .sign-row td { padding: 8px 12px; font-size: 13px; }
             .sign-row td:last-child { text-align: right; }
@@ -1505,7 +1192,7 @@ const itemsHtml = (data.details || []).map((d: any, idx: number) => {
           <div class="sheet">
             <table class="title-grid">
               <tr>
-                <td class="title">Estimate -new</td>
+                <td class="title">Order</td>
                 <td class="page">Page 1 of 1</td>
               </tr>
             </table>
@@ -1517,9 +1204,8 @@ const itemsHtml = (data.details || []).map((d: any, idx: number) => {
                     <div><strong>M/s :</strong></div>
                     <div class="left-lines">
                       <div class="name"><strong>${this.escapeHtml(customerLines[0] || data.customername || '')}</strong></div>
-                      ${(customerLines.slice(1).map((line: string) => `<div class="line">${this.escapeHtml(line)}</div>`).join('')) || '<div class="line">&nbsp;</div>'}
+                      ${(customerLines.slice(1).map((line: string) => `<div class="line">${this.escapeHtml(line)}</div>`).join('')) || '<div class="line">&nbsp;</div><div class="line">&nbsp;</div>'}
                     </div>
-                    <div class="line" style="margin-top: 4px;"><strong>Delivery :</strong> ${this.escapeHtml(data.deliverylocation || '')}</div>
                   </div>
                 </td>
                 <td style="width:38%" class="right-box">
@@ -1531,12 +1217,10 @@ const itemsHtml = (data.details || []).map((d: any, idx: number) => {
                 </td>
               </tr>
             </table>
-
             <table class="items">
               <thead>
                 <tr>
                   <th>no</th>
-                  <th>Avg.</th>
                   <th>Particulars</th>
                   <th>Pieces</th>
                   <th>Weight</th>
@@ -1549,42 +1233,16 @@ const itemsHtml = (data.details || []).map((d: any, idx: number) => {
                 ${blankRowsHtml}
               </tbody>
             </table>
-
             <table class="totals-row">
               <tr>
-                <td class="label"></td>
-                <td class="label"></td>
-                <td class="label"></td>
-                <td class="label"></td>
-                <td class="label">Total  Pcs</td>
+                <td class="label">Total</td>
+                <td class="value"></td>
                 <td class="value">${this.formatQty(data.totalpcs)}</td>
-                <td class="label">Total  Kgs</td>
                 <td class="value">${this.formatIndianNumber(totalWgt, 2)}</td>
+                <td class="value"></td>
                 <td class="value">${this.formatIndianNumber(billAmt, 2)}</td>
               </tr>
             </table>
-
-            <table class="bottom-wrap">
-              <tr>
-                <td style="width:62%" class="left-bottom">
-                  <div class="narration"><strong>Narration : ${this.escapeHtml(data.narration || '')}</strong></div>
-                  <div class="rupees"><strong>Rs:</strong> ${this.escapeHtml(this.amountInWords(netAmt).toLowerCase())} only</div>
-                </td>
-                <td style="width:38%" class="right-bottom">
-                  <table>
-                    <tr><td class="slabel">Load Amt :</td><td class="sval">${this.formatIndianNumber(loadAmt, 2)}</td></tr>
-                    <tr><td class="slabel">${this.escapeHtml(data.other1_desp || 'Other 1')} :</td><td class="sval">${this.formatIndianNumber(other1Amt, 2)}</td></tr>
-                    <tr><td class="slabel">${this.escapeHtml(data.other2_desp || 'Other 2')} :</td><td class="sval">${this.formatIndianNumber(other2Amt, 2)}</td></tr>
-                    <tr><td class="slabel">&nbsp;</td><td class="sval">&nbsp;</td></tr>
-                    <tr><td class="slabel">Total Amount :</td><td class="sval">${this.formatIndianNumber(totalAmtBeforeGst, 2)}</td></tr>
-                    <tr><td class="slabel">GST @ ${this.formatIndianNumber(gstPer, 2)} % :</td><td class="sval">${this.formatIndianNumber(gstAmt, 2)}</td></tr>
-                    <tr><td class="slabel"><strong>Nett Amount :</strong></td><td class="sval"><strong>${this.formatIndianNumber(netAmt, 2)}</strong></td></tr>
-                  </table>
-                </td>
-              </tr>
-            </table>
-
-            <div class="thanks">Thank you Visit Again</div>
             <table class="sign-row">
               <tr>
                 <td>Checked By</td>
@@ -1616,20 +1274,12 @@ const itemsHtml = (data.details || []).map((d: any, idx: number) => {
 
   async confirmDelete() {
     if (!this.invoiceToDelete()) return;
-    
     this.saving.set(true);
-    
     try {
-      await this.service.deleteSalesDetailsByBillno(this.invoiceToDelete().id);
-      const success = await this.service.deleteSalesHeader(this.invoiceToDelete().id);
-      
-      if (success) {
-        this.toastService.success('Invoice deleted successfully');
-        this.closeDeleteModal();
-        await this.loadData();
-      } else {
-        this.toastService.error('Failed to delete invoice');
-      }
+      await this.service.deleteOrderHeader(this.invoiceToDelete()!.id);
+      this.toastService.success('Invoice deleted');
+      this.closeDeleteModal();
+      await this.loadData();
     } catch (err: any) {
       this.toastService.error(err.message || 'Failed to delete invoice');
     } finally {
@@ -1637,29 +1287,11 @@ const itemsHtml = (data.details || []).map((d: any, idx: number) => {
     }
   }
 
-  async printInvoiceFromList(inv: any) {
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) {
-      this.toastService.error('Please allow popups to print');
-      return;
-    }
-
-    try {
-      const details = await this.service.getSalesDetails(inv.id);
-      
-      const printData = {
-        ...inv,
-        details: details
-      };
-      
-      this.printInvoice(printData, printWindow);
-    } catch (err: any) {
-      printWindow.close();
-      this.toastService.error('Failed to load invoice details');
-    }
+  toggleGcsheetMenu() {
+    this.showGcsheetMenu = !this.showGcsheetMenu;
   }
 
-  toggleMasterMenu() { this.showMasterMenu = !this.showMasterMenu; }
-  toggleGcsheetMenu() { this.showGcsheetMenu = !this.showGcsheetMenu; }
+  toggleMasterMenu() {
+    this.showMasterMenu = !this.showMasterMenu;
+  }
 }
-

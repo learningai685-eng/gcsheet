@@ -17,7 +17,7 @@ import { TabAsEnterDirective } from '../../shared/directives/tab-as-enter.direct
       <div class="container-fluid">
         <a class="navbar-brand" (click)="goToDashboard()" style="cursor: pointer;">
           <i class="bi bi-shield-check me-2"></i>
-          SuperAdmin
+          GCSheet
         </a>
         <button class="navbar-toggler" type="button" (click)="isCollapsed = !isCollapsed">
           <span class="navbar-toggler-icon"></span>
@@ -25,8 +25,8 @@ import { TabAsEnterDirective } from '../../shared/directives/tab-as-enter.direct
         
         <div class="collapse navbar-collapse" [class.show]="!isCollapsed" (click)="isCollapsed = true">
           <ul class="navbar-nav me-auto">
-            <li class="nav-item">
-              <a class="nav-link" (click)="goToDashboard()" style="cursor: pointer;">
+<li class="nav-item">
+              <a class="nav-link" (click)="goToDashboard()">
                 <i class="bi bi-speedometer2 me-1"></i> Dashboard
               </a>
             </li>
@@ -321,15 +321,15 @@ import { TabAsEnterDirective } from '../../shared/directives/tab-as-enter.direct
                       (keydown.arrowdown)="moveMmSelection(1, $event)"
                       (keydown.arrowup)="moveMmSelection(-1, $event)"
                       (keydown.enter)="onMmEnter($event)"
-                      (focus)="openMmDropdown()"
+                      (focus)="openMmDropdown(); filterMmListOnFocus();"
                       (blur)="closeMmDropdownDelayed()"
-                      (click)="$event.stopPropagation()"
+                      (click)="$event.stopPropagation(); openMmDropdown(); filterMmListOnFocus();"
                       [class.is-invalid]="mmInvalid()"
                       #mmSelect
                     >
                     <label>MM</label>
                     @if (showMmDropdown() && filteredMmList().length > 0) {
-                      <ul class="list-group autocomplete-dropdown">
+                      <ul class="list-group autocomplete-dropdown" id="mmDropdown">
                         @for (item of filteredMmList(); track item.id; let i = $index) {
                           <li
                             class="list-group-item list-group-item-action"
@@ -348,11 +348,11 @@ import { TabAsEnterDirective } from '../../shared/directives/tab-as-enter.direct
                     <input type="text" class="form-control" placeholder=" " [value]="cmpQuery()"
                       (input)="onCmpSearch($any($event.target).value)" (keydown.arrowdown)="moveCmpSelection(1, $event)"
                       (keydown.arrowup)="moveCmpSelection(-1, $event)" (keydown.enter)="onCmpEnter($event)"
-                      (focus)="openCmpDropdown()" (blur)="closeCmpDropdownDelayed()" (click)="$event.stopPropagation()"
+                      (focus)="openCmpDropdown(); filterCmpListOnFocus();" (blur)="closeCmpDropdownDelayed()" (click)="$event.stopPropagation(); openCmpDropdown(); filterCmpListOnFocus();"
                       [class.is-invalid]="cmpInvalid()" #cmpSelect>
                     <label>CMP</label>
                     @if (showCmpDropdown() && filteredCmpList().length > 0) {
-                      <ul class="list-group autocomplete-dropdown">
+                      <ul class="list-group autocomplete-dropdown" id="cmpDropdown">
                         @for (item of filteredCmpList(); track item.id; let i = $index) {
                           <li class="list-group-item list-group-item-action" [class.top-match]="i === highlightedCmpIndex()"
                             (mousedown)="selectCmp(item.id, item['name'])">{{ item['name'] }}</li>
@@ -366,11 +366,11 @@ import { TabAsEnterDirective } from '../../shared/directives/tab-as-enter.direct
                     <input type="text" class="form-control" placeholder=" " [value]="fitQuery()"
                       (input)="onFitSearch($any($event.target).value)" (keydown.arrowdown)="moveFitSelection(1, $event)"
                       (keydown.arrowup)="moveFitSelection(-1, $event)" (keydown.enter)="onFitEnter($event)"
-                      (focus)="openFitDropdown()" (blur)="closeFitDropdownDelayed()" (click)="$event.stopPropagation()"
+                      (focus)="openFitDropdown(); filterFitListOnFocus();" (blur)="closeFitDropdownDelayed()" (click)="$event.stopPropagation(); openFitDropdown(); filterFitListOnFocus();"
                       [class.is-invalid]="fitInvalid()" #fitSelect>
                     <label>FIT</label>
                     @if (showFitDropdown() && filteredFitList().length > 0) {
-                      <ul class="list-group autocomplete-dropdown">
+                      <ul class="list-group autocomplete-dropdown" id="fitDropdown">
                         @for (item of filteredFitList(); track item.id; let i = $index) {
                           <li class="list-group-item list-group-item-action" [class.top-match]="i === highlightedFitIndex()"
                             (mousedown)="selectFit(item.id, item['name'])">{{ item['name'] }}</li>
@@ -386,11 +386,11 @@ import { TabAsEnterDirective } from '../../shared/directives/tab-as-enter.direct
                     <input type="text" class="form-control" placeholder=" " [value]="naliQuery()"
                       (input)="onNaliSearch($any($event.target).value)" (keydown.arrowdown)="moveNaliSelection(1, $event)"
                       (keydown.arrowup)="moveNaliSelection(-1, $event)" (keydown.enter)="onNaliEnter($event)"
-                      (focus)="openNaliDropdown()" (blur)="closeNaliDropdownDelayed()" (click)="$event.stopPropagation()"
+                      (focus)="openNaliDropdown(); filterNaliListOnFocus();" (blur)="closeNaliDropdownDelayed()" (click)="$event.stopPropagation(); openNaliDropdown(); filterNaliListOnFocus();"
                       [class.is-invalid]="naliInvalid()" #naliSelect>
                     <label>NALI</label>
                     @if (showNaliDropdown() && filteredNaliList().length > 0) {
-                      <ul class="list-group autocomplete-dropdown">
+                      <ul class="list-group autocomplete-dropdown" id="naliDropdown">
                         @for (item of filteredNaliList(); track item.id; let i = $index) {
                           <li class="list-group-item list-group-item-action" [class.top-match]="i === highlightedNaliIndex()"
                             (mousedown)="selectNali(item.id, item['name'])">{{ item['name'] }}</li>
@@ -404,11 +404,11 @@ import { TabAsEnterDirective } from '../../shared/directives/tab-as-enter.direct
                     <input type="text" class="form-control" placeholder=" " [value]="gradeQuery()"
                       (input)="onGradeSearch($any($event.target).value)" (keydown.arrowdown)="moveGradeSelection(1, $event)"
                       (keydown.arrowup)="moveGradeSelection(-1, $event)" (keydown.enter)="onGradeEnter($event)"
-                      (focus)="openGradeDropdown()" (blur)="closeGradeDropdownDelayed()" (click)="$event.stopPropagation()"
+                      (focus)="openGradeDropdown(); filterGradeListOnFocus();" (blur)="closeGradeDropdownDelayed()" (click)="$event.stopPropagation(); openGradeDropdown(); filterGradeListOnFocus();"
                       [class.is-invalid]="gradeInvalid()" #gradeSelect>
                     <label>Grade</label>
                     @if (showGradeDropdown() && filteredGradeList().length > 0) {
-                      <ul class="list-group autocomplete-dropdown">
+                      <ul class="list-group autocomplete-dropdown" id="gradeDropdown">
                         @for (item of filteredGradeList(); track item.id; let i = $index) {
                           <li class="list-group-item list-group-item-action" [class.top-match]="i === highlightedGradeIndex()"
                             (mousedown)="selectGrade(item.id, item['name'])">{{ item['name'] }}</li>
@@ -422,11 +422,11 @@ import { TabAsEnterDirective } from '../../shared/directives/tab-as-enter.direct
                     <input type="text" class="form-control" placeholder=" " [value]="itemQuery()"
                       (input)="onItemSearch($any($event.target).value)" (keydown.arrowdown)="moveItemSelection(1, $event)"
                       (keydown.arrowup)="moveItemSelection(-1, $event)" (keydown.enter)="onItemEnter($event)"
-                      (focus)="openItemDropdown()" (blur)="closeItemDropdownDelayed()" (click)="$event.stopPropagation()"
+                      (focus)="openItemDropdown(); filterItemListOnFocus();" (blur)="closeItemDropdownDelayed()" (click)="$event.stopPropagation(); openItemDropdown(); filterItemListOnFocus();"
                       [class.is-invalid]="itemInvalid()" #itemSelect>
                     <label>Item</label>
                     @if (showItemDropdown() && filteredItemList().length > 0) {
-                      <ul class="list-group autocomplete-dropdown">
+                      <ul class="list-group autocomplete-dropdown" id="itemDropdown">
                         @for (item of filteredItemList(); track item.id; let i = $index) {
                           <li class="list-group-item list-group-item-action" [class.top-match]="i === highlightedItemIndex()"
                             (mousedown)="selectItem(item.id, item['name'])">{{ item['name'] }}</li>
@@ -936,6 +936,16 @@ export class GcsheetPktmasterComponent implements OnInit {
     const next = this.highlightedMmIndex() + step;
     const clamped = Math.max(0, Math.min(list.length - 1, next));
     this.highlightedMmIndex.set(clamped);
+    setTimeout(() => this.scrollHighlightedItem('mm'), 10);
+  }
+
+  scrollHighlightedItem(type: string) {
+    const dropdownEl = document.querySelector(`#${type}Dropdown`) as HTMLElement;
+    if (!dropdownEl) return;
+    const activeItem = dropdownEl.querySelector('.top-match') as HTMLElement;
+    if (activeItem) {
+      activeItem.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
   }
 
   selectMm(id: string, name: string) {
@@ -957,40 +967,75 @@ export class GcsheetPktmasterComponent implements OnInit {
     setTimeout(() => this.showMmDropdown.set(false), 120);
   }
 
+  filterMmListOnFocus() {
+    const currentQuery = this.mmQuery();
+    const q = currentQuery.trim().toLowerCase();
+    const filtered = this.mmList().filter(m => (m['name'] || '').toLowerCase().includes(q));
+    const sorted = filtered.sort((a, b) => (a['name'] || '').toLowerCase().localeCompare((b['name'] || '').toLowerCase()));
+    if (sorted.length > 0) {
+      this.highlightedMmIndex.set(0);
+    }
+  }
+
   onCmpSearch(value: string) { this.cmpQuery.set(value); this.showCmpDropdown.set(true); this.highlightedCmpIndex.set(0); this.selectedCmpId.set(null); this.packetForm.patchValue({ cmpno: '' }); this.cmpInvalid.set(true); this.updatePktname(); }
   onCmpEnter(event: Event) { event.preventDefault(); const list = this.filteredCmpList(); const idx = Math.min(Math.max(this.highlightedCmpIndex(), 0), list.length - 1); const selected = list[idx]; if (!selected) return; this.selectCmp(selected.id, selected['name']); }
-  moveCmpSelection(step: number, event: Event) { event.preventDefault(); const list = this.filteredCmpList(); if (!list.length) return; this.showCmpDropdown.set(true); const next = this.highlightedCmpIndex() + step; this.highlightedCmpIndex.set(Math.max(0, Math.min(list.length - 1, next))); }
+  moveCmpSelection(step: number, event: Event) { event.preventDefault(); const list = this.filteredCmpList(); if (!list.length) return; this.showCmpDropdown.set(true); const next = this.highlightedCmpIndex() + step; this.highlightedCmpIndex.set(Math.max(0, Math.min(list.length - 1, next))); setTimeout(() => this.scrollHighlightedItem('cmp'), 10); }
   selectCmp(id: string, name: string) { this.selectedCmpId.set(id); this.cmpQuery.set(name); this.packetForm.patchValue({ cmpno: id }); this.showCmpDropdown.set(false); this.highlightedCmpIndex.set(0); this.cmpInvalid.set(false); this.updatePktname(); }
   openCmpDropdown() { this.showCmpDropdown.set(true); this.highlightedCmpIndex.set(0); }
   closeCmpDropdownDelayed() { setTimeout(() => this.showCmpDropdown.set(false), 120); }
+  filterCmpListOnFocus() {
+    const q = this.cmpQuery().trim().toLowerCase();
+    const filtered = this.cmpList().filter(c => (c['name'] || '').toLowerCase().includes(q));
+    if (filtered.length > 0) this.highlightedCmpIndex.set(0);
+  }
 
   onFitSearch(value: string) { this.fitQuery.set(value); this.showFitDropdown.set(true); this.highlightedFitIndex.set(0); this.selectedFitId.set(null); this.packetForm.patchValue({ fitno: '' }); this.fitInvalid.set(true); this.updatePktname(); }
   onFitEnter(event: Event) { event.preventDefault(); const list = this.filteredFitList(); const idx = Math.min(Math.max(this.highlightedFitIndex(), 0), list.length - 1); const selected = list[idx]; if (!selected) return; this.selectFit(selected.id, selected['name']); }
-  moveFitSelection(step: number, event: Event) { event.preventDefault(); const list = this.filteredFitList(); if (!list.length) return; this.showFitDropdown.set(true); const next = this.highlightedFitIndex() + step; this.highlightedFitIndex.set(Math.max(0, Math.min(list.length - 1, next))); }
+  moveFitSelection(step: number, event: Event) { event.preventDefault(); const list = this.filteredFitList(); if (!list.length) return; this.showFitDropdown.set(true); const next = this.highlightedFitIndex() + step; this.highlightedFitIndex.set(Math.max(0, Math.min(list.length - 1, next))); setTimeout(() => this.scrollHighlightedItem('fit'), 10); }
   selectFit(id: string, name: string) { this.selectedFitId.set(id); this.fitQuery.set(name); this.packetForm.patchValue({ fitno: id }); this.showFitDropdown.set(false); this.highlightedFitIndex.set(0); this.fitInvalid.set(false); this.updatePktname(); }
   openFitDropdown() { this.showFitDropdown.set(true); this.highlightedFitIndex.set(0); }
   closeFitDropdownDelayed() { setTimeout(() => this.showFitDropdown.set(false), 120); }
+  filterFitListOnFocus() {
+    const q = this.fitQuery().trim().toLowerCase();
+    const filtered = this.fitList().filter(f => (f['name'] || '').toLowerCase().includes(q));
+    if (filtered.length > 0) this.highlightedFitIndex.set(0);
+  }
 
   onNaliSearch(value: string) { this.naliQuery.set(value); this.showNaliDropdown.set(true); this.highlightedNaliIndex.set(0); this.selectedNaliId.set(null); this.packetForm.patchValue({ nalino: '' }); this.naliInvalid.set(true); this.updatePktname(); }
   onNaliEnter(event: Event) { event.preventDefault(); const list = this.filteredNaliList(); const idx = Math.min(Math.max(this.highlightedNaliIndex(), 0), list.length - 1); const selected = list[idx]; if (!selected) return; this.selectNali(selected.id, selected['name']); }
-  moveNaliSelection(step: number, event: Event) { event.preventDefault(); const list = this.filteredNaliList(); if (!list.length) return; this.showNaliDropdown.set(true); const next = this.highlightedNaliIndex() + step; this.highlightedNaliIndex.set(Math.max(0, Math.min(list.length - 1, next))); }
+  moveNaliSelection(step: number, event: Event) { event.preventDefault(); const list = this.filteredNaliList(); if (!list.length) return; this.showNaliDropdown.set(true); const next = this.highlightedNaliIndex() + step; this.highlightedNaliIndex.set(Math.max(0, Math.min(list.length - 1, next))); setTimeout(() => this.scrollHighlightedItem('nali'), 10); }
   selectNali(id: string, name: string) { this.selectedNaliId.set(id); this.naliQuery.set(name); this.packetForm.patchValue({ nalino: id }); this.showNaliDropdown.set(false); this.highlightedNaliIndex.set(0); this.naliInvalid.set(false); this.updatePktname(); }
   openNaliDropdown() { this.showNaliDropdown.set(true); this.highlightedNaliIndex.set(0); }
   closeNaliDropdownDelayed() { setTimeout(() => this.showNaliDropdown.set(false), 120); }
+  filterNaliListOnFocus() {
+    const q = this.naliQuery().trim().toLowerCase();
+    const filtered = this.naliList().filter(n => (n['name'] || '').toLowerCase().includes(q));
+    if (filtered.length > 0) this.highlightedNaliIndex.set(0);
+  }
 
   onGradeSearch(value: string) { this.gradeQuery.set(value); this.showGradeDropdown.set(true); this.highlightedGradeIndex.set(0); this.selectedGradeId.set(null); this.packetForm.patchValue({ gradeno: '' }); this.gradeInvalid.set(true); this.updatePktname(); }
   onGradeEnter(event: Event) { event.preventDefault(); const list = this.filteredGradeList(); const idx = Math.min(Math.max(this.highlightedGradeIndex(), 0), list.length - 1); const selected = list[idx]; if (!selected) return; this.selectGrade(selected.id, selected['name']); }
-  moveGradeSelection(step: number, event: Event) { event.preventDefault(); const list = this.filteredGradeList(); if (!list.length) return; this.showGradeDropdown.set(true); const next = this.highlightedGradeIndex() + step; this.highlightedGradeIndex.set(Math.max(0, Math.min(list.length - 1, next))); }
+  moveGradeSelection(step: number, event: Event) { event.preventDefault(); const list = this.filteredGradeList(); if (!list.length) return; this.showGradeDropdown.set(true); const next = this.highlightedGradeIndex() + step; this.highlightedGradeIndex.set(Math.max(0, Math.min(list.length - 1, next))); setTimeout(() => this.scrollHighlightedItem('grade'), 10); }
   selectGrade(id: string, name: string) { this.selectedGradeId.set(id); this.gradeQuery.set(name); this.packetForm.patchValue({ gradeno: id }); this.showGradeDropdown.set(false); this.highlightedGradeIndex.set(0); this.gradeInvalid.set(false); this.updatePktname(); }
   openGradeDropdown() { this.showGradeDropdown.set(true); this.highlightedGradeIndex.set(0); }
   closeGradeDropdownDelayed() { setTimeout(() => this.showGradeDropdown.set(false), 120); }
+  filterGradeListOnFocus() {
+    const q = this.gradeQuery().trim().toLowerCase();
+    const filtered = this.gradeList().filter(g => (g['name'] || '').toLowerCase().includes(q));
+    if (filtered.length > 0) this.highlightedGradeIndex.set(0);
+  }
 
   onItemSearch(value: string) { this.itemQuery.set(value); this.showItemDropdown.set(true); this.highlightedItemIndex.set(0); this.selectedItemId.set(null); this.packetForm.patchValue({ itemno: '' }); this.itemInvalid.set(true); this.updatePktname(); }
   onItemEnter(event: Event) { event.preventDefault(); const list = this.filteredItemList(); const idx = Math.min(Math.max(this.highlightedItemIndex(), 0), list.length - 1); const selected = list[idx]; if (!selected) return; this.selectItem(selected.id, selected['name']); }
-  moveItemSelection(step: number, event: Event) { event.preventDefault(); const list = this.filteredItemList(); if (!list.length) return; this.showItemDropdown.set(true); const next = this.highlightedItemIndex() + step; this.highlightedItemIndex.set(Math.max(0, Math.min(list.length - 1, next))); }
+  moveItemSelection(step: number, event: Event) { event.preventDefault(); const list = this.filteredItemList(); if (!list.length) return; this.showItemDropdown.set(true); const next = this.highlightedItemIndex() + step; this.highlightedItemIndex.set(Math.max(0, Math.min(list.length - 1, next))); setTimeout(() => this.scrollHighlightedItem('item'), 10); }
   selectItem(id: string, name: string) { this.selectedItemId.set(id); this.itemQuery.set(name); this.packetForm.patchValue({ itemno: id }); this.showItemDropdown.set(false); this.highlightedItemIndex.set(0); this.itemInvalid.set(false); this.updatePktname(); }
   openItemDropdown() { this.showItemDropdown.set(true); this.highlightedItemIndex.set(0); }
   closeItemDropdownDelayed() { setTimeout(() => this.showItemDropdown.set(false), 120); }
+  filterItemListOnFocus() {
+    const q = this.itemQuery().trim().toLowerCase();
+    const filtered = this.itemList().filter(i => (i['name'] || '').toLowerCase().includes(q));
+    if (filtered.length > 0) this.highlightedItemIndex.set(0);
+  }
 
   getDropdownName(id: string | null, list: any[], type: string): string {
     if (!id) return '-';

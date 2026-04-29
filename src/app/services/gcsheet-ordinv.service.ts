@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { PocketbaseService } from './pocketbase.service';
 
-export interface SalesHeader {
+export interface OrderHeader {
   id: string;
   billno: number;
   billdate: string;
@@ -25,7 +25,7 @@ export interface SalesHeader {
   gstamt?: number;
 }
 
-export interface SalesDetail {
+export interface OrderDetail {
   id: string;
   billno: string;
   pktno: string;
@@ -40,12 +40,11 @@ export interface SalesDetail {
 @Injectable({
   providedIn: 'root'
 })
-export class GcsheetSaleinvService {
+export class GcsheetOrdinvService {
   private pb = PocketbaseService.getInstance().getClient();
 
-  // ✅ HEADER LIST (SAFE MAPPING)
-  async getSalesHeaderAll(): Promise<SalesHeader[]> {
-    const res = await this.pb.collection('egcsheet1_salesmy')
+  async getOrderHeaderAll(): Promise<OrderHeader[]> {
+    const res = await this.pb.collection('egcsheet1_ordsmy')
       .getList(1, 200, { sort: '-created' });
 
     return res.items.map((r: any) => ({
@@ -73,9 +72,8 @@ export class GcsheetSaleinvService {
     }));
   }
 
-  // ✅ REQUIRED FOR REPORT SCREEN
-  async getSalesDetailAll(): Promise<SalesDetail[]> {
-    const res = await this.pb.collection('egcsheet1_saledet')
+  async getOrderDetailAll(): Promise<OrderDetail[]> {
+    const res = await this.pb.collection('egcsheet1_orddet')
       .getList(1, 500, { sort: 'billno,srno' });
 
     return res.items.map((r: any) => ({
@@ -90,8 +88,8 @@ export class GcsheetSaleinvService {
     }));
   }
 
-  async getSalesDetailByBillno(billno: string): Promise<SalesDetail[]> {
-    const records = await this.pb.collection('egcsheet1_saledet').getFullList({
+  async getOrderDetailByBillno(billno: string): Promise<OrderDetail[]> {
+    const records = await this.pb.collection('egcsheet1_orddet').getFullList({
       filter: `billno="${billno}"`,
       sort: 'srno'
     });
@@ -108,46 +106,74 @@ export class GcsheetSaleinvService {
     }));
   }
 
-  // ✅ FAST DELETE
-  async deleteSalesDetailsByBillno(billno: string): Promise<boolean> {
+  async deleteOrderDetailsByBillno(billno: string): Promise<boolean> {
     try {
-      const details = await this.getSalesDetailByBillno(billno);
+      const records = await this.pb.collection('egcsheet1_orddet').getFullList({
+        filter: `billno="${billno}"`,
+        sort: 'srno'
+      });
+      
+      if (records.length === 0) return true;
 
-      await Promise.all(
-        details.map(d =>
-          this.pb.collection('egcsheet1_saledet').delete(d.id)
-        )
-      );
-
+      const ids = records.map((r: any) => r.id);
+      const BATCH_SIZE = 100;
+      
+      for (let i = 0; i < ids.length; i += BATCH_SIZE) {
+        const batch = ids.slice(i, i + BATCH_SIZE);
+        await Promise.all(
+          batch.map((id: string) => this.pb.collection('egcsheet1_orddet').delete(id).catch(() => null))
+        );
+      }
       return true;
     } catch {
       return false;
     }
   }
 
-  async createSalesHeader(data: any) {
-    console.log('Service creating header with data:', JSON.stringify(data, null, 2));
-    const result = await this.pb.collection('egcsheet1_salesmy').create(data);
-    console.log('Service create result:', JSON.stringify(result, null, 2));
+  async createOrderHeader(data: any) {
+    const result = await this.pb.collection('egcsheet1_ordsmy').create(data);
     return result;
   }
 
-  async updateSalesHeader(id: string, data: any) {
-    return await this.pb.collection('egcsheet1_salesmy').update(id, data);
+  async updateOrderHeader(id: string, data: any) {
+    return await this.pb.collection('egcsheet1_ordsmy').update(id, data);
   }
 
-  async deleteSalesHeader(id: string) {
-    return await this.pb.collection('egcsheet1_salesmy').delete(id);
+  async deleteOrderHeader(id: string) {
+    return await this.pb.collection('egcsheet1_ordsmy').delete(id);
   }
 
-  // ✅ FAST INSERT - Sequential batches for remote servers
-  async createSalesDetailsBatch(details: any[], onProgress?: (done: number, total: number) => void) {
-    const BATCH_SIZE = 10;
+  async createOrderDetailsBatch(details: any[], onProgress?: (done: number, total: number) => void) {
+    if (details.length === 0) return;
+    
+    const BATCH_SIZE = 50;
     
     for (let i = 0; i < details.length; i += BATCH_SIZE) {
       const batch = details.slice(i, i + BATCH_SIZE);
       await Promise.all(
-        batch.map(d => this.pb.collection('egcsheet1_saledet').create(d))
+        batch.map((d: any) => this.pb.collection('egcsheet1_orddet').create(d).catch((err: any) => {
+          console.error('Error creating detail:', err);
+          throw err;
+        }))
+      );
+      if (onProgress) {
+        onProgress(Math.min(i + BATCH_SIZE, details.length), details.length);
+      }
+    }
+  }
+
+  async createOrderDetailsBatchWithBillno(billno: string, details: any[], onProgress?: (done: number, total: number) => void) {
+    if (details.length === 0) return;
+    
+    const BATCH_SIZE = 100;
+    
+    for (let i = 0; i < details.length; i += BATCH_SIZE) {
+      const batch = details.slice(i, i + BATCH_SIZE).map(d => ({ ...d, billno }));
+      await Promise.all(
+        batch.map((d: any) => this.pb.collection('egcsheet1_orddet').create(d).catch((err: any) => {
+          console.error('Error creating detail:', err);
+          throw err;
+        }))
       );
       if (onProgress) {
         onProgress(Math.min(i + BATCH_SIZE, details.length), details.length);
@@ -156,7 +182,7 @@ export class GcsheetSaleinvService {
   }
 
   async getMaxBillno(): Promise<number> {
-    const res = await this.pb.collection('egcsheet1_salesmy')
+    const res = await this.pb.collection('egcsheet1_ordsmy')
       .getList(1, 1, { sort: '-billno' });
 
     if (res.items.length > 0) {
@@ -172,17 +198,12 @@ export class GcsheetSaleinvService {
     return res.items;
   }
 
-  // ✅ Get sales details by header ID (direct query using relation field)
-  async getSalesDetails(headerId: string): Promise<SalesDetail[]> {
-    console.log('DB Query: getSalesDetails by headerId:', headerId);
-    const startTime = Date.now();
-    
-    const records = await this.pb.collection('egcsheet1_saledet').getList(1, 100, {
+  async getOrderDetails(headerId: string): Promise<OrderDetail[]> {
+    const records = await this.pb.collection('egcsheet1_orddet').getList(1, 100, {
       filter: `billno="${headerId}"`,
       sort: 'srno'
     });
 
-    console.log(`DB Query: ${records.items.length} items in ${Date.now() - startTime}ms`);
     return records.items.map((r: any) => ({
       id: r.id,
       billno: r.billno,
@@ -195,32 +216,6 @@ export class GcsheetSaleinvService {
     }));
   }
 
-  // ✅ LOGFILE METHODS
-  async getLogfileTodayDate(): Promise<string> {
-    const logfile = await this.getActiveLogfile();
-    return logfile?.date || '';
-  }
-
-  async updateLogfileStatus(startDate: string): Promise<any> {
-    return await this.pb.collection('egcsheet1_logfile').update(startDate, { status: 'closed' });
-  }
-
-  async createLogfileNextDay(startDate: string): Promise<any> {
-    const nextDate = new Date(startDate);
-    nextDate.setDate(nextDate.getDate() + 1);
-    const dateStr = nextDate.toISOString().split('T')[0];
-    return await this.pb.collection('egcsheet1_logfile').create({ date: dateStr, status: 'active' });
-  }
-
-  async getActiveLogfile(): Promise<any> {
-    const res = await this.pb.collection('egcsheet1_logfile').getList(1, 1, {
-      filter: 'status="active"',
-      sort: '-created'
-    });
-    return res.items[0] || null;
-  }
-
-  // ✅ CACHE CLEAR (placeholder for future implementation)
   clearCache(): void {
     console.log('Cache cleared');
   }

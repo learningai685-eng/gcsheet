@@ -15,7 +15,7 @@ import { PaginationComponent } from '../../shared/pagination/pagination.componen
   template: `
     <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
       <div class="container-fluid">
-        <a class="navbar-brand" (click)="goToDashboard()" style="cursor: pointer;"><i class="bi bi-shield-check me-2"></i>SuperAdmin</a>
+        <a class="navbar-brand" (click)="goToDashboard()" style="cursor: pointer;"><i class="bi bi-shield-check me-2"></i>GCSheet</a>
         <button class="navbar-toggler" type="button" (click)="isCollapsed = !isCollapsed"><span class="navbar-toggler-icon"></span></button>
         <div class="collapse navbar-collapse" [class.show]="!isCollapsed">
           <ul class="navbar-nav me-auto">

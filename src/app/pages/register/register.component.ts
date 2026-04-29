@@ -27,7 +27,7 @@ function passwordMatchValidator(control: AbstractControl): ValidationErrors | nu
         <div class="register-header">
           <h2 class="text-center mb-4">
             <i class="bi bi-person-plus-fill me-2"></i>
-            SuperAdmin Registration
+            GCSheet Registration
           </h2>
         </div>
 
